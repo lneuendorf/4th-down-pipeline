@@ -21,9 +21,11 @@ def get_recommendations(
         pd.DataFrame: DataFrame containing 4th down recommendations for each game
     """
     games = dl.load_games(year, week, season_type, force_data_update)
-
     plays = dl.load_plays(year, week, season_type, force_data_update)
-
+    weather = dl.load_weather(year, week, season_type, force_data_update)
+    venues = dl.load_venues(force_data_update)
+    lines = dl.load_lines(year, week, season_type, force_data_update)
+    ppa = dl.load_ppa(year, week, season_type, force_data_update)
     breakpoint()
     return None
     
