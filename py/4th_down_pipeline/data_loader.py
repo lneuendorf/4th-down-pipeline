@@ -1,8 +1,6 @@
-import re
-import os
-import json
-import logging
+import re, os, json, logging
 from os.path import join
+from typing import Optional
 import pandas as pd
 import cfbd
 
@@ -24,19 +22,26 @@ with open(CONFIG_PATH) as f:
 
 def load_games(
     year: int, 
-    week: int, 
-    season_type: str, 
-    force_data_update: bool = False
+    week: Optional[int] = None,
+    season_type: Optional[str] = None,
+    force_data_update: Optional[bool] = False
 ) -> pd.DataFrame:
     """Load games data for a specific year, week, and season type from CFBD API.
+    Must pass a value for year, but if week and season_type are not provided,
+    all games for the year will be returned.
     
     Args:
         year (int): Year of the season (e.g., 2023)
-        week (int): Week number of the season (e.g., 1-15 for regular season)
-        season_type (str): Type of the season ('regular' or 'postseason')
-        force_data_update (bool): If True, forces data to be fetched from API even 
-            if cached data exists.
+        week (int, optional): Week number of the season (e.g., 1-15 for regular season)
+        season_type (str, optional): Type of the season ('regular' or 'postseason')
+        force_data_update (bool, optional): If True, forces data to be fetched 
+            from API even if cached data exists.
     """
+    if season_type is None and week is not None:
+        raise ValueError('If week is provided, season_type must also be provided')
+    if season_type is not None and week is None:
+        raise ValueError('If season_type is provided, week must also be provided')
+
     id_cols = [
         'id', 'season', 'week', 'season_type', 'completed', 'neutral_site',
         'venue_id', 'start_date'
@@ -58,12 +63,15 @@ def load_games(
     if os.path.exists(file_path) and not force_data_update:
         LOG.info(f'Reading {year} games data from cached data')
         games = pd.read_parquet(file_path)
+        if season_type is None and week is None:
+            return games.reset_index(drop=True)
         if not games.query('season_type == @season_type and week == @week').empty:
             return games[
                 (games['week'] == week) &
                 (games['season_type'] == season_type)
             ].reset_index(drop=True)
-        LOG.info(f'Missing week {week}, fetching from CFBD API')
+        else:
+            LOG.info(f'Missing week {week}, fetching from CFBD API')
     LOG.info(f'Fetching {year} games data from CFBD API')
 
     # Fetch from CFBD API
@@ -89,6 +97,9 @@ def load_games(
 
     games.to_parquet(file_path)
 
+    if season_type is None and week is None:
+        return games.reset_index(drop=True)
+
     return games[
         (games['week'] == week) &
         (games['season_type'] == season_type)
@@ -96,19 +107,26 @@ def load_games(
 
 def load_plays(
     year: int, 
-    week: int, 
-    season_type: str, 
+    week: Optional[int] = None,
+    season_type: Optional[str] = None,
     force_data_update: bool = False
 ) -> pd.DataFrame:
     """Load plays data for a specific year, week, and season type from CFBD API.
-
+    Must pass a value for year, but if week and season_type are not provided,
+    all plays for the year will be returned.
+    
     Args:
         year (int): Year of the season (e.g., 2023)
-        week (int): Week number of the season (e.g., 1-15 for regular season)
-        season_type (str): Type of the season ('regular' or 'postseason')
+        week (int, optional): Week number of the season (e.g., 1-15 for regular season)
+        season_type (str, optional): Type of the season ('regular' or 'postseason')
         force_data_update (bool): If True, forces data to be fetched from API even 
             if cached data exists.
     """
+    if season_type is None and week is not None:
+        raise ValueError('If week is provided, season_type must also be provided')
+    if season_type is not None and week is None:
+        raise ValueError('If season_type is provided, week must also be provided')
+
     cols = [
         'season', 'week', 'season_type',
         'id', 'drive_id', 'game_id', 'drive_number', 'play_number', 'offense',
@@ -122,50 +140,162 @@ def load_plays(
     os.makedirs(plays_dir, exist_ok=True)
     file_path = join(plays_dir, f'{year}.parquet')
 
-    plays_cached = pd.DataFrame()
+    # Check if cached data exists
     if os.path.exists(file_path) and not force_data_update:
         LOG.info(f'Reading {year} plays from cached data')
         plays_cached = pd.read_parquet(file_path)
-
+        
+        # Return all plays for the year if no week/season_type specified
+        if season_type is None and week is None:
+            return plays_cached.reset_index(drop=True)
+        
+        # Return specific week if it exists in cache
         if not plays_cached.query('season_type == @season_type and week == @week').empty:
             return plays_cached[
                 (plays_cached['week'] == week) &
                 (plays_cached['season_type'] == season_type)
             ].reset_index(drop=True)
-        LOG.info(f'Missing {year} week {week}, fetching from CFBD API')
+        else:
+            LOG.info(f'Missing {year} week {week}, fetching from CFBD API')
     else:
-        LOG.info(f'Fetching {year} week {week} plays from CFBD API')
+        LOG.info(f'Fetching {year} plays data from CFBD API')
+        plays_cached = pd.DataFrame()
 
-    # Fetch from CFBD API
+    # If we need to fetch data for a specific week
+    if week is not None and season_type is not None:
+        # Fetch from CFBD API for specific week
+        with cfbd.ApiClient(configuration) as api_client:
+            api_instance = cfbd.PlaysApi(api_client)
+            data = api_instance.get_plays(
+                year=year, 
+                week=week, 
+                season_type=cfbd.SeasonType(season_type)
+            )
+        plays = pd.DataFrame([val.to_dict() for val in data])
+        plays.columns = _convert_to_snake_case(plays.columns)
+        plays = (
+            plays.assign(
+                season=year,
+                week=week,
+                season_type=season_type,
+                clock_minutes=lambda x: x['clock'].apply(lambda y: y['minutes']),
+                clock_seconds=lambda x: x['clock'].apply(lambda y: y['seconds'])
+            )
+            .drop(columns=['clock'])
+        )
+        
+        # Combine with cached data and save
+        plays_all = pd.concat([plays_cached, plays[cols]], ignore_index=True)
+        plays_all.drop_duplicates(inplace=True)
+        plays_all.to_parquet(file_path)
+        
+        return plays_all[
+            (plays_all['week'] == week) &
+            (plays_all['season_type'] == season_type)
+        ].reset_index(drop=True)
+    
+    # If we need to fetch all plays for the year
+    else:
+        # Fetch all weeks and season types for the year
+        all_plays = []
+        
+        # Fetch regular season weeks
+        LOG.info(f'Fetching {year} regular season plays from CFBD API')
+        with cfbd.ApiClient(configuration) as api_client:
+            api_instance = cfbd.PlaysApi(api_client)
+            
+            # Get regular season weeks (typically 1-15)
+            for week_num in range(1, 16):  # Adjust range as needed
+                try:
+                    data = api_instance.get_plays(
+                        year=year, 
+                        week=week_num, 
+                        season_type=cfbd.SeasonType('regular')
+                    )
+                    week_plays = pd.DataFrame([val.to_dict() for val in data])
+                    week_plays.columns = _convert_to_snake_case(week_plays.columns)
+                    week_plays = (
+                        week_plays.assign(
+                            season=year,
+                            week=week_num,
+                            season_type='regular',
+                            clock_minutes=lambda x: x['clock'].apply(lambda y: y['minutes']),
+                            clock_seconds=lambda x: x['clock'].apply(lambda y: y['seconds'])
+                        )
+                        .drop(columns=['clock'])
+                    )
+                    all_plays.append(week_plays[cols])
+                    LOG.info(f'Fetched week {week_num} regular season plays')
+                except Exception as e:
+                    LOG.warning(f'Failed to fetch week {week_num} regular season: {e}')
+            
+            # Get postseason weeks
+            LOG.info(f'Fetching {year} postseason plays from CFBD API')
+            try:
+                for week in range(1, 5): 
+                    data = api_instance.get_plays(
+                        year=year, 
+                        week=week,
+                        season_type=cfbd.SeasonType('postseason')
+                    )
+                    postseason_plays = pd.DataFrame([val.to_dict() for val in data])
+                    postseason_plays.columns = _convert_to_snake_case(postseason_plays.columns)
+                    postseason_plays = (
+                        postseason_plays.assign(
+                            season=year,
+                            week=week,
+                            season_type='postseason',
+                            clock_minutes=lambda x: x['clock'].apply(lambda y: y['minutes']),
+                            clock_seconds=lambda x: x['clock'].apply(lambda y: y['seconds'])
+                        )
+                        .drop(columns=['clock'])
+                    )
+                    all_plays.append(postseason_plays[cols])
+                LOG.info('Fetched postseason plays')
+            except Exception as e:
+                LOG.warning(f'Failed to fetch postseason plays: {e}')
+        
+        # Combine all plays
+        if all_plays:
+            plays_all = pd.concat(all_plays, ignore_index=True)
+            plays_all.drop_duplicates(inplace=True)
+            plays_all.to_parquet(file_path)
+            return plays_all.reset_index(drop=True)
+        else:
+            return pd.DataFrame(columns=cols)
+
+def load_teams(
+    year: int,
+    force_data_update: bool = False
+) -> pd.DataFrame:
+    """Load teams data from CFBD API.
+
+    Args:
+        year (int): Year of the season (e.g., 2023)
+        force_data_update (bool): If True, forces data to be fetched from API even
+            if cached data exists.
+    Returns:
+        pd.DataFrame: DataFrame containing team information
+    """
+    teams_dir = join(DATA_PATH, 'teams')
+    os.makedirs(teams_dir, exist_ok=True)
+    file_path = join(teams_dir, f'teams.parquet')
+
+    if os.path.exists(file_path) and not force_data_update:
+        LOG.info(f'Reading teams data from cached data')
+        teams = pd.read_parquet(file_path)
+        if not teams.query('season == @year').empty:
+            return teams[teams['season'] == year].reset_index(drop=True)
+        LOG.info(f'Missing {year} teams')
+    LOG.info(f'Fetching {year} teams data from CFBD API')
+
     with cfbd.ApiClient(configuration) as api_client:
-        api_instance = cfbd.PlaysApi(api_client)
-        data = api_instance.get_plays(
-            year=year, 
-            week=week, 
-            season_type=cfbd.SeasonType(season_type)
-        )
-    plays = pd.DataFrame([val.to_dict() for val in data])
-    plays.columns = _convert_to_snake_case(plays.columns)
-    plays = (
-        plays.assign(
-            season=year,
-            week=week,
-            season_type=season_type,
-            clock_minutes=lambda x: x['clock'].apply(lambda y: y['minutes']),
-            clock_seconds=lambda x: x['clock'].apply(lambda y: y['seconds'])
-        )
-        .drop(columns=['clock'])
-    )
-
-    # Combine with cached data and save
-    plays_all = pd.concat([plays_cached, plays[cols]], ignore_index=True)
-    plays_all.drop_duplicates(inplace=True)
-    plays_all.to_parquet(file_path)
-
-    return plays_all[
-        (plays_all['week'] == week) &
-        (plays_all['season_type'] == season_type)
-    ].reset_index(drop=True)
+        api_instance = cfbd.TeamsApi(api_client)
+        data = api_instance.get_teams(year=year)
+    teams = pd.DataFrame([val.to_dict() for val in data])
+    teams.columns = _convert_to_snake_case(teams.columns)
+    teams.to_parquet(file_path)
+    return teams
 
 def load_weather(
     year: int, 
@@ -392,6 +522,28 @@ def load_ppa(
         (ppa['week'] == week) &
         (ppa['season_type'] == season_type)
     ].reset_index(drop=True)
+
+def load_elo(
+    year: int, 
+    week: int, 
+    season_type: str, 
+    force_data_update: bool = False
+) -> pd.DataFrame:
+    """Load ELO data for a specific year, week, and season type from CFBD API.
+
+    Args:
+        year (int): Year of the season (e.g., 2023)
+        week (int): Week number of the season (e.g., 1-15 for regular season)
+        season_type (str): Type of the season ('regular' or 'postseason')
+        force_data_update (bool): If True, forces data to be fetched from API even 
+            if cached data exists.
+    Returns:
+        pd.DataFrame: DataFrame containing ELO ratings for each team
+    """
+    
+    # data needed: games and teams
+
+    pass
 
 def _convert_to_snake_case(cols):
     cols_new = []
