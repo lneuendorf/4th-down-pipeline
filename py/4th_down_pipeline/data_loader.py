@@ -3,6 +3,7 @@ from os.path import join
 from typing import Optional
 import pandas as pd
 import cfbd
+from elo.elo_updater import update_elo
 
 CONFIG_PATH = '../../config.json'
 DATA_PATH = '../../data'
@@ -279,7 +280,7 @@ def load_teams(
     """
     teams_dir = join(DATA_PATH, 'teams')
     os.makedirs(teams_dir, exist_ok=True)
-    file_path = join(teams_dir, f'teams.parquet')
+    file_path = join(teams_dir, f'{year}.parquet')
 
     if os.path.exists(file_path) and not force_data_update:
         LOG.info(f'Reading teams data from cached data')
@@ -294,6 +295,7 @@ def load_teams(
         data = api_instance.get_teams(year=year)
     teams = pd.DataFrame([val.to_dict() for val in data])
     teams.columns = _convert_to_snake_case(teams.columns)
+    teams.insert(0, 'season', year)
     teams.to_parquet(file_path)
     return teams
 
@@ -540,10 +542,36 @@ def load_elo(
     Returns:
         pd.DataFrame: DataFrame containing ELO ratings for each team
     """
-    
-    # data needed: games and teams
 
-    pass
+    elo_dir = join(DATA_PATH, 'elo')
+    os.makedirs(elo_dir, exist_ok=True)
+    file_path = join(elo_dir, f'{year}.parquet')
+
+    if os.path.exists(file_path) and not force_data_update:
+        LOG.info(f'Reading {year} ELO data from cached data')
+        elo = pd.read_parquet(file_path)
+        if not elo.query('season_type == @season_type and week == @week').empty:
+            return elo[
+                (elo['week'] == week) &
+                (elo['season_type'] == season_type)
+            ].reset_index(drop=True)
+        LOG.info(f'Missing {year} week {week} ELO data')
+    LOG.info(f'Generating {year} week {week} ELO data')
+
+    years = range(1930, year + 1)
+    games, teams = [], []
+    for year in years:
+        games.append(load_games(year, force_data_update=force_data_update))
+        teams.append(load_teams(year, force_data_update=force_data_update))
+    games = pd.concat(games, ignore_index=True)
+    teams = pd.concat(teams, ignore_index=True)
+
+    elo = update_elo(games, teams, year, week, season_type, file_path, force_data_update)
+
+    return elo[
+        (elo['week'] == week) &
+        (elo['season_type'] == season_type)
+    ].reset_index(drop=True)
 
 def _convert_to_snake_case(cols):
     cols_new = []
