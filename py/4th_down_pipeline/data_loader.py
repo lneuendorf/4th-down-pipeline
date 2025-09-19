@@ -566,7 +566,7 @@ def load_elo(
     games = pd.concat(games, ignore_index=True)
     teams = pd.concat(teams, ignore_index=True)
 
-    elo = update_elo(games, teams, year, week, season_type, file_path, force_data_update)
+    elo = update_elo(games, teams, year, week, season_type)
 
     return elo[
         (elo['week'] == week) &
