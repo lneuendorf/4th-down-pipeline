@@ -27,6 +27,9 @@ def get_recommendations(
     lines = dl.load_lines(year, week, season_type, force_data_update)
     ppa = dl.load_ppa(year, week, season_type, force_data_update)
     elo = dl.load_elo(year, week, season_type, force_data_update)
+    team_strengths = dl.load_team_strengths(year, week, season_type, force_data_update)
+
+    # TODO: impute missing team strengths using models
     breakpoint()
     return None
     

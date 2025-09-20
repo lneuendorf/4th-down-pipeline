@@ -4,6 +4,7 @@ from typing import Optional
 import pandas as pd
 import cfbd
 from elo.elo_updater import update_elo
+from team_strength.team_strength import calculate_team_strengths
 
 CONFIG_PATH = '../../config.json'
 DATA_PATH = '../../data'
@@ -469,16 +470,19 @@ def load_lines(
 
 def load_ppa(
     year: int, 
-    week: int, 
-    season_type: str, 
+    week: Optional[int] = None,
+    season_type: Optional[str] = None,
+    current_week: Optional[int] = None,
+    current_season_type: Optional[str] = None,
     force_data_update: bool = False
 ) -> pd.DataFrame:
     """Load PPA data for a specific year, week, and season type from CFBD API.
 
     Args:
         year (int): Year of the season (e.g., 2023)
-        week (int): Week number of the season (e.g., 1-15 for regular season)
-        season_type (str): Type of the season ('regular' or 'postseason')
+        week Optional[int]: Week number of the season (e.g., 1-15 for regular season)
+        season_type Optional[str]: Type of the season ('regular' or 'postseason')
+        current_week (int, optional): Current week of the season
         force_data_update (bool): If True, forces data to be fetched from API even 
             if cached data exists.
     Returns:
@@ -488,9 +492,36 @@ def load_ppa(
     os.makedirs(ppa_dir, exist_ok=True)
     file_path = join(ppa_dir, f'{year}.parquet')
 
+    if (season_type is None and week is not None) or (season_type is not None and week is None):
+        raise ValueError('If week is provided, season_type must also be provided, and vice versa')
+    if season_type is None and week is None and year is not None:
+        pull_all = True
+    else:
+        pull_all = False
+
     if os.path.exists(file_path) and not force_data_update:
         LOG.info(f'Reading {year} PPA data from cached data')
         ppa = pd.read_parquet(file_path)
+        if pull_all:
+            if current_week is not None and current_season_type is not None: 
+                if not ppa.query('season_type == @current_season_type and week == @current_week').empty:
+                    if current_season_type == 'regular':
+                        return (
+                            ppa
+                            .query('season_type == "regular" and week <= @current_week')
+                            .reset_index(drop=True)
+                        )
+                    else:
+                        return pd.concat([
+                            ppa[ppa['season_type'] == 'regular'],
+                            ppa[
+                                (ppa['season_type'] == current_season_type) & 
+                                (ppa['week'] <= current_week)
+                            ]
+                        ], ignore_index=True).reset_index(drop=True)
+                LOG.info(f'Missing up to current week {current_week}, fetching from CFBD API')
+            else:
+                return ppa.reset_index(drop=True)
         if not ppa.query('season_type == @season_type and week == @week').empty:
             return ppa[
                 (ppa['week'] == week) &
@@ -520,6 +551,24 @@ def load_ppa(
 
     ppa.to_parquet(file_path)
 
+    if pull_all:
+        if current_week is not None and current_season_type is not None:
+            if current_season_type == 'regular':
+                return (
+                    ppa
+                    .query('season_type == "regular" and week <= @current_week')
+                    .reset_index(drop=True)
+                )
+            else:
+                return pd.concat([
+                    ppa[ppa['season_type'] == 'regular'],
+                    ppa[
+                        (ppa['season_type'] == current_season_type) & 
+                        (ppa['week'] <= current_week)
+                    ]
+                ], ignore_index=True).reset_index(drop=True)
+        else:
+            return ppa.reset_index(drop=True)
     return ppa[
         (ppa['week'] == week) &
         (ppa['season_type'] == season_type)
@@ -572,6 +621,52 @@ def load_elo(
         (elo['week'] == week) &
         (elo['season_type'] == season_type)
     ].reset_index(drop=True)
+
+def load_team_strengths(
+    year: int,
+    week: int,
+    season_type: str,
+    force_data_update: bool = False
+) -> pd.DataFrame:
+    """Load team strength data for a specific year, week, and season type.
+
+    Args:
+        year (int): Year of the season (e.g., 2023)
+        week (int): Week number of the season (e.g., 1-15 for regular season)
+        season_type (str): Type of the season ('regular' or 'postseason')
+        force_data_update (bool): If True, forces data to be fetched from API even 
+            if cached data exists.
+    Returns:
+        pd.DataFrame: DataFrame containing team strength metrics for each team
+    """
+
+    team_strengths_dir = join(DATA_PATH, 'team_strengths')
+    os.makedirs(team_strengths_dir, exist_ok=True)
+    file_path = join(team_strengths_dir, f'{year}.parquet')
+
+    ppa = pd.concat([
+        load_ppa(year - 1),
+        load_ppa(year, current_week=week, current_season_type=season_type)
+    ])
+
+    if os.path.exists(file_path) and not force_data_update:
+        LOG.info(f'Reading {year} team strengths from cached data')
+        team_strengths = pd.read_parquet(file_path)
+        if not team_strengths.query('season_type == @season_type and week == @week').empty:
+            return team_strengths[
+                (team_strengths['week'] == week) &
+                (team_strengths['season_type'] == season_type)
+            ].reset_index(drop=True)
+        LOG.info(f'Missing {year} week {week} team strengths')
+    LOG.info(f'Generating {year} week {week} team strengths')
+
+    team_strengths = calculate_team_strengths(ppa, year, week, season_type)
+
+    return team_strengths[
+        (team_strengths['week'] == week) &
+        (team_strengths['season_type'] == season_type)
+    ].reset_index(drop=True)
+
 
 def _convert_to_snake_case(cols):
     cols_new = []
