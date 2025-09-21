@@ -591,7 +591,6 @@ def load_elo(
     Returns:
         pd.DataFrame: DataFrame containing ELO ratings for each team
     """
-
     elo_dir = join(DATA_PATH, 'elo')
     os.makedirs(elo_dir, exist_ok=True)
     file_path = join(elo_dir, f'{year}.parquet')
@@ -639,7 +638,6 @@ def load_team_strengths(
     Returns:
         pd.DataFrame: DataFrame containing team strength metrics for each team
     """
-
     team_strengths_dir = join(DATA_PATH, 'team_strengths')
     os.makedirs(team_strengths_dir, exist_ok=True)
     file_path = join(team_strengths_dir, f'{year}.parquet')
