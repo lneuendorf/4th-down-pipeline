@@ -4,7 +4,7 @@ from sklearn.linear_model import LinearRegression
 import pandas as pd
 import numpy as np
 
-MODEL_DIR = '../../models'
+MODEL_DIR = 'models'
 
 def engineer_features(
     games: pd.DataFrame,

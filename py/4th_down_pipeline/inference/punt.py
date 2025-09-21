@@ -1,7 +1,7 @@
 import xgboost as xgb
 import pandas as pd
 
-MODEL_PATH = '../../../models/punt_yards_to_goal/xgb_classifier.json'
+MODEL_PATH = 'models/punt_yards_to_goal/xgb_classifier.json'
 
 def predict_receiving_team_yards_to_goal(
     df: pd.DataFrame

@@ -3,7 +3,7 @@ from os.path import join
 import pandas as pd
 import numpy as np
 
-DATA_PATH = '../../data'
+DATA_PATH = 'data'
 
 def update_elo(
     games: pd.DataFrame, 

@@ -2,8 +2,8 @@ import pandas as pd
 import statsmodels.api as sm
 from scipy.stats import norm
 
-SELECTION_MODEL_PATH = '../../../models/fg_probability/selection_model.pkl'
-OUTCOME_MODEL_PATH = '../../../models/fg_probability/outcome_model.pkl'
+SELECTION_MODEL_PATH = 'models/fg_probability/selection_model.pkl'
+OUTCOME_MODEL_PATH = 'models/fg_probability/outcome_model.pkl'
 
 def predict_field_goal_probability(
     df: pd.DataFrame

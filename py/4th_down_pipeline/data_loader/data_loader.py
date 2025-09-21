@@ -3,11 +3,11 @@ from os.path import join
 from typing import Optional
 import pandas as pd
 import cfbd
-from elo.elo_updater import update_elo
-from team_strength.team_strength import calculate_team_strengths
+from feature_engineering.elo_updater import update_elo
+from feature_engineering.team_strength import calculate_team_strengths
 
-CONFIG_PATH = '../../config.json'
-DATA_PATH = '../../data'
+CONFIG_PATH = 'config.json'
+DATA_PATH = 'data'
 
 pd.set_option('future.no_silent_downcasting', True)
 

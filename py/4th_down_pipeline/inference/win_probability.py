@@ -1,7 +1,7 @@
 import xgboost as xgb
 import pandas as pd
 
-MODEL_PATH = '../../../models/win_probability/xgb_classifier.json'
+MODEL_PATH = 'models/win_probability/xgb_classifier.json'
 
 def predict_win_probability(
     df: pd.DataFrame, 

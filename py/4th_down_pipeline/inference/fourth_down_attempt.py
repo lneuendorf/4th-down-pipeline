@@ -1,7 +1,7 @@
 import xgboost as xgb
 import pandas as pd
 
-MODEL_PATH = '../../../models/fourth_down/xgb_classifier.json'
+MODEL_PATH = 'models/fourth_down/xgb_classifier.json'
 
 def predict_conversion_probability(
     df: pd.DataFrame
