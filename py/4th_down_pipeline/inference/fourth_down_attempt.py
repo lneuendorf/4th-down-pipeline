@@ -50,41 +50,41 @@ def compute_fourth_down_attempt_eWP(data: pd.DataFrame) -> pd.DataFrame:
         data
         .assign(
             score_diff=lambda x: np.where(
-                x.yards_to_goal <= 1,  # if scored touchdown
+                x.yards_to_goal <= x.distance,  # if scored touchdown
                 (-1 * x['score_diff']) - 7, # flip defense to offense team
                 x['score_diff']
             ),
             diff_time_ratio=lambda x: np.where(
-                x.yards_to_goal <= 1,  # if scored touchdown
+                x.yards_to_goal <= x.distance, # if scored touchdown
                 (-x['score_diff'] - 7) * np.exp(4 * (3600 - np.maximum(x['game_seconds_remaining'] - 5, 0)) / 3600),
                 (x['score_diff']) * np.exp(4 * (3600 - np.maximum(x['game_seconds_remaining'] - 5, 0)) / 3600)
             ),
             spread_time_ratio=lambda x: np.where(
-                x.yards_to_goal <= 1,  # if scored touchdown
-                (-x['pregame_spread']) * np.exp(4 * (3600 - np.maximum(x['game_seconds_remaining'] - 5, 0)) / 3600),
-                (x['pregame_spread']) * np.exp(4 * (3600 - np.maximum(x['game_seconds_remaining'] - 5, 0)) / 3600)
+                x.yards_to_goal <= x.distance,  # if scored touchdown
+                (-x['pregame_spread']) * np.exp(-4 * (3600 - np.maximum(x['game_seconds_remaining'] - 5, 0)) / 3600),
+                (x['pregame_spread']) * np.exp(-4 * (3600 - np.maximum(x['game_seconds_remaining'] - 5, 0)) / 3600)
             ),
             pregame_offense_elo_new=lambda x: x.pregame_offense_elo,
             pregame_defense_elo_new=lambda x: x.pregame_defense_elo,
             pct_game_played=lambda x: np.minimum(x['pct_game_played'] + five_seconds_pct, 1.0),
             seconds_left_in_half=lambda x: np.maximum(x['seconds_left_in_half'] - 5, 0),
             is_home_team=lambda x: np.where(
-                x.yards_to_goal <= 1, # if scored touchdown
+                x.yards_to_goal <= x.distance, # if scored touchdown
                 np.select([x['is_home_team'] == 1, x['is_home_team'] == -1], [-1, 1], default=0), 
                 x['is_home_team']
             ),
             offense_timeouts_new=lambda x: np.where(
-                x.yards_to_goal <= 1, # if scored touchdown
+                x.yards_to_goal <= x.distance, # if scored touchdown
                 x['defense_timeouts'],
                 x['offense_timeouts']
             ),
             defense_timeouts_new=lambda x: np.where(
-                x.yards_to_goal <= 1, # if scored touchdown
+                x.yards_to_goal <= x.distance, # if scored touchdown
                 x['offense_timeouts'],
                 x['defense_timeouts']
             ),
             yards_to_goal=lambda x: np.where(
-                x.yards_to_goal <= 1, # if scored touchdown
+                x.yards_to_goal <= x.distance, # if scored touchdown
                 80,
                 x['yards_to_goal'] - x['distance']
             ),
@@ -117,21 +117,22 @@ def compute_fourth_down_attempt_eWP(data: pd.DataFrame) -> pd.DataFrame:
     # If the conversion leads to a TD, then flip the WP back from defense to offense
     probas = win_probability.predict_win_probability(wp_convert_data)
     probas = np.where(
-        data.yards_to_goal.values <= 1,
+        data.yards_to_goal.values <= data.distance.values,
         1 - probas,
         probas
     )
     # Set WP to 1 or 0 if the game is over after the FG
     pct_game_played = wp_convert_data['pct_game_played'].values
     yards_to_goal = data.yards_to_goal.values
+    distance = data.distance.values
     score_diff = wp_convert_data['score_diff'].values
     game_over_win = (pct_game_played == 1.0) & (
-        ((yards_to_goal <= 1) & ((-1 * score_diff) > 0)) |
-        ((yards_to_goal > 1) & (score_diff > 0))
+        ((yards_to_goal <= distance) & ((-1 * score_diff) > 0)) |
+        ((yards_to_goal > distance) & (score_diff > 0))
     )
     game_over_loss = (pct_game_played == 1.0) & (
-        ((yards_to_goal <= 1) & ((-1 * score_diff) < 0)) |
-        ((yards_to_goal > 1) & (score_diff < 0))
+        ((yards_to_goal <= distance) & ((-1 * score_diff) < 0)) |
+        ((yards_to_goal > distance) & (score_diff < 0))
     )
     probas[game_over_win] = 1.0
     probas[game_over_loss] = 0.0
@@ -146,10 +147,10 @@ def compute_fourth_down_attempt_eWP(data: pd.DataFrame) -> pd.DataFrame:
         .assign(
             score_diff=lambda x: x.score_diff * -1,
             diff_time_ratio=lambda x: (
-                -x['score_diff'] * np.exp(4 * (3600 - np.maximum(x['game_seconds_remaining'] - 5, 0)) / 3600)
+                (-x['score_diff'] * np.exp(4 * (3600 - np.maximum(x['game_seconds_remaining'] - 5, 0)) / 3600))
             ),
             spread_time_ratio=lambda x: (
-                -x['pregame_spread']) * np.exp(4 * (3600 - np.maximum(x['game_seconds_remaining'] - 5, 0)) / 3600
+                (-x['pregame_spread']) * np.exp(-4 * (3600 - np.maximum(x['game_seconds_remaining'] - 5, 0)) / 3600)
             ),
             pregame_offense_elo_new=lambda x: x.pregame_defense_elo,
             pregame_defense_elo_new=lambda x: x.pregame_offense_elo,
