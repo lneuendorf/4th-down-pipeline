@@ -5,7 +5,7 @@ from scipy.stats import norm
 SELECTION_MODEL_PATH = 'models/fg_probability/selection_model.pkl'
 OUTCOME_MODEL_PATH = 'models/fg_probability/outcome_model.pkl'
 
-def predict_field_goal_probability(
+def predict_field_goal_make_probability(
     df: pd.DataFrame
 ) -> pd.Series:
     """ 
@@ -17,7 +17,7 @@ def predict_field_goal_probability(
     Returns:
         pd.Series: Field goal probability predictions (values between 0 and 1).
     """
-    
+
     selection_features = [
         'yards_to_goal', 
         'score_diff',
@@ -34,13 +34,12 @@ def predict_field_goal_probability(
         'game_indoors'
     ]
 
-    
     selection_df = df[selection_features]
     selection_model = _load_model(SELECTION_MODEL_PATH)
     df['probit_score'] = selection_model.predict(sm.add_constant(selection_df))
     
     # Inverse Mills Ratio λ = φ / Φ
-    W_gamma = df.prodit_score
+    W_gamma = df.probit_score
     phi = norm.pdf(W_gamma)
     Phi = norm.cdf(W_gamma)
     df['lambda'] = phi / Phi

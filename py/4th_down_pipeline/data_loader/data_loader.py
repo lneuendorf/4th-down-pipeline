@@ -640,7 +640,7 @@ def load_team_strengths(
     """
     team_strengths_dir = join(DATA_PATH, 'team_strengths')
     os.makedirs(team_strengths_dir, exist_ok=True)
-    file_path = join(team_strengths_dir, f'{year}.parquet')
+    file_path = join(team_strengths_dir, f'{year}_{week}_{season_type}.parquet')
 
     ppa = pd.concat([
         load_ppa(year - 1),
@@ -652,6 +652,7 @@ def load_team_strengths(
         team_strengths = pd.read_parquet(file_path)
         if not team_strengths.query('season_type == @season_type and week == @week').empty:
             return team_strengths[
+                (team_strengths['season'] == year) &
                 (team_strengths['week'] == week) &
                 (team_strengths['season_type'] == season_type)
             ].reset_index(drop=True)
@@ -660,10 +661,15 @@ def load_team_strengths(
 
     team_strengths = calculate_team_strengths(ppa, year, week, season_type)
 
-    return team_strengths[
-        (team_strengths['week'] == week) &
-        (team_strengths['season_type'] == season_type)
-    ].reset_index(drop=True)
+    team_strengths = (
+        team_strengths
+        .query('season == @year and week == @week and season_type == @season_type')
+        .reset_index(drop=True)
+    )
+
+    team_strengths.to_parquet(file_path)
+
+    return team_strengths
 
 
 def _convert_to_snake_case(cols):

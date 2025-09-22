@@ -199,6 +199,11 @@ def engineer_features(
                 data['home_spread'], 
                 -data['home_spread']
             ),
+            seconds_left_in_half = lambda x: np.where(
+                x['period'].isin([1,2]), 
+                (2 - x['period']) * 15 * 60 + (x['clock_minutes'] * 60 + x['clock_seconds']),
+                (4 - x['period']) * 15 * 60 + (x['clock_minutes'] * 60 + x['clock_seconds'])
+            ),
         )
 
         .assign(
@@ -232,6 +237,8 @@ def engineer_features(
             how='left'
         )
     )
+
+    data = _add_kneel_features(data)
 
     return data
 
@@ -325,6 +332,42 @@ def add_decision(data: pd.DataFrame) -> pd.DataFrame:
         ],
         default=-1
     )
+
+    return data
+
+def _add_kneel_features(data: pd.DataFrame) -> pd.DataFrame:
+    def seconds_after_kneelout(row, play_clock=40, kneel_duration=2):
+        """
+        Returns the number of seconds remaining after the offense kneels out the game,
+        simulating play-by-play, including two-minute warning and downs.
+        """
+        seconds = row['game_seconds_remaining']
+        timeouts = row['defense_timeouts']
+        downs_remaining = 4 - row['down'] + 1
+        prior_to_two_minute = seconds > 120
+            
+        while seconds > 0 and downs_remaining > 0:
+            # Add kneel duration first
+            seconds -= kneel_duration
+            
+            if timeouts > 0:
+                timeouts -= 1
+            else:
+                if prior_to_two_minute and 119 <= seconds and seconds <= (120 + play_clock):
+                    prior_to_two_minute = False
+                    seconds = 120
+                else:
+                    # Burn full play clock
+                    seconds -= play_clock
+            downs_remaining -= 1
+        
+        return max(seconds, 0)
+
+    data['seconds_after_kneelout'] = data.apply(seconds_after_kneelout, axis=1)
+    data['can_kneel_out'] = data.seconds_after_kneelout <= 0
+    data['can_kneel_out_30'] = data.seconds_after_kneelout <= 30
+    data['can_kneel_out_60'] = data.seconds_after_kneelout <= 60
+    data['can_kneel_out_90'] = data.seconds_after_kneelout <= 90
 
     return data
 
