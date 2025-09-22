@@ -211,7 +211,7 @@ def engineer_features(
                 x['score_diff'] * np.exp(4 * (3600 - x['game_seconds_remaining']) / 3600)
             ),
             spread_time_ratio = lambda x: (
-                x['pregame_spread'] * np.exp(4 * (3600 - x['game_seconds_remaining']) / 3600)
+                x['pregame_spread'] * np.exp(-4 * (3600 - x['game_seconds_remaining']) / 3600)
             ),
         )
     )
