@@ -53,10 +53,10 @@ def compute_punt_eWP(data: pd.DataFrame) -> pd.DataFrame:
         data.assign(
             score_diff=lambda x: -x['score_diff'],
             diff_time_ratio=lambda x: (
-                -x['score_diff']) * np.exp(4 * (3600 - np.maximum(x['game_seconds_remaining'] - 5, 0)) / 3600
+                (-x['score_diff']) * np.exp(4 * (3600 - np.maximum(x['game_seconds_remaining'] - 5, 0)) / 3600)
             ),
             spread_time_ratio=lambda x: (
-                -x['pregame_spread']) * np.exp(4 * (3600 - np.maximum(x['game_seconds_remaining'] - 5, 0)) / 3600
+                (-x['pregame_spread']) * np.exp(-4 * (3600 - np.maximum(x['game_seconds_remaining'] - 5, 0)) / 3600)
             ),
             pregame_offense_elo_new=lambda x: x.pregame_defense_elo,
             pregame_defense_elo_new=lambda x: x.pregame_offense_elo,
@@ -110,7 +110,7 @@ def compute_punt_eWP(data: pd.DataFrame) -> pd.DataFrame:
     probas[(wp_data['pct_game_played'] == 1.0) & ((-1 * wp_data['score_diff']) < 0)] = 0.0
 
     data['exp_wp_punt'] = np.round(probas, 4)
-
+    
     return data
 
 def predict_receiving_team_yards_to_goal(
