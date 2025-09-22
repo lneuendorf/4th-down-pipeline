@@ -62,10 +62,10 @@ def compute_field_goal_eWP(data: pd.DataFrame) -> pd.DataFrame:
         data.assign(
             score_diff=lambda x: -x['score_diff'] - 3,
             diff_time_ratio=lambda x: (
-                -x['score_diff'] - 3) * np.exp(4 * (3600 - np.maximum(x['game_seconds_remaining'] - 5, 0)) / 3600
+                (-x['score_diff'] - 3) * np.exp(4 * (3600 - np.maximum(x['game_seconds_remaining'] - 5, 0)) / 3600)
             ),
             spread_time_ratio=lambda x: (
-                -x['pregame_spread']) * np.exp(4 * (3600 - np.maximum(x['game_seconds_remaining'] - 5, 0)) / 3600
+                (-x['pregame_spread']) * np.exp(-4 * (3600 - np.maximum(x['game_seconds_remaining'] - 5, 0)) / 3600)
             ),
             pregame_offense_elo_new=lambda x: x.pregame_defense_elo,
             pregame_defense_elo_new=lambda x: x.pregame_offense_elo,
@@ -118,10 +118,10 @@ def compute_field_goal_eWP(data: pd.DataFrame) -> pd.DataFrame:
         data.assign(
             score_diff=lambda x: (-1 * x['score_diff']),
             diff_time_ratio=lambda x: (
-                -x['score_diff']) * np.exp(4 * (3600 - np.maximum(x['game_seconds_remaining'] - 5, 0)) / 3600
+                (-x['score_diff']) * np.exp(4 * (3600 - np.maximum(x['game_seconds_remaining'] - 5, 0)) / 3600)
             ),
             spread_time_ratio=lambda x: (
-                -x['pregame_spread']) * np.exp(4 * (3600 - np.maximum(x['game_seconds_remaining'] - 5, 0)) / 3600
+                (-x['pregame_spread']) * np.exp(-4 * (3600 - np.maximum(x['game_seconds_remaining'] - 5, 0)) / 3600)
             ),
             pregame_offense_elo_new=lambda x: x.pregame_defense_elo,
             pregame_defense_elo_new=lambda x: x.pregame_offense_elo,
@@ -167,8 +167,11 @@ def compute_field_goal_eWP(data: pd.DataFrame) -> pd.DataFrame:
     # round probas to 3 decimal places
     data['wp_miss_proba'] = np.round(probas, 3)
 
-    data['exp_wp_fg'] = (data['fg_make_proba'] * data['wp_make_proba']) + ((1 - data['fg_make_proba']) * data['wp_miss_proba']).round(4)
-
+    data['exp_wp_fg'] = (
+        (data['fg_make_proba'] * data['wp_make_proba']) + 
+        ((1 - data['fg_make_proba']) * data['wp_miss_proba'])
+    ).round(4)
+    
     return data
 
 def predict_field_goal_make_probability(
