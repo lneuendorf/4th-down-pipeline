@@ -1,6 +1,10 @@
+import pickle
+from os.path import join
 import numpy as np
 import pandas as pd
 from scipy.optimize import minimize
+
+MODEL_DIR = 'models'
 
 def calculate_team_strengths(
     ppa: pd.DataFrame,
@@ -112,3 +116,24 @@ def calculate_team_strengths(
     })
     
     return df_strengths
+
+def impute_missing_team_strengths(data: pd.DataFrame) -> pd.DataFrame:
+    """ Impute missing team strengths using linear regression based on ELO ratings. """
+    offense_model = pickle.load(open(join(MODEL_DIR, 'team_strength', 'offense.pkl'), 'rb'))
+    defense_model = pickle.load(open(join(MODEL_DIR, 'team_strength', 'defense.pkl'), 'rb'))
+
+    # Offense Strength
+    mask = data['offense_strength'].isna()
+    if mask.sum() != 0:
+        data.loc[mask, 'offense_strength'] = offense_model.predict(
+            data.loc[mask, ['pregame_offense_elo']]
+        )
+
+    # Defense Strength
+    mask = data['defense_strength'].isna()
+    if mask.sum() != 0:
+        data.loc[mask, 'defense_strength'] = defense_model.predict(
+            data.loc[mask, ['pregame_defense_elo']]
+        )
+
+    return data
