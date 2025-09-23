@@ -2,9 +2,11 @@ import logging
 import xgboost as xgb
 import pandas as pd
 import numpy as np
+import statsmodels.api as sm
 from inference import win_probability
 
-MODEL_PATH = 'models/punt_yards_to_goal/xgb_classifier.json'
+XGB_MODEL_PATH = 'models/punt_yards_to_goal/xgb_classifier.json'
+LR_MODEL_PATH = 'models/punt_yards_to_goal/linear_regression_model.pkl'
 
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', 
@@ -15,12 +17,16 @@ LOG = logging.getLogger(__name__)
 def compute_punt_eWP(data: pd.DataFrame) -> pd.DataFrame:
     """ Compute punt expected win probabilities """
     LOG.info('Predicting punt yards to goal.')
-    data['receiving_team_yards_to_goal'] = predict_receiving_team_yards_to_goal(
-        data.rename(columns={
-            'yards_to_goal':'punt_team_end_yards_to_goal',
-            'pregame_offense_elo':'punting_team_pregame_elo',
-            'pregame_defense_elo':'receiving_team_pregame_elo',
-        })
+    data['receiving_team_yards_to_goal'] = np.where(
+        data.yards_to_goal < 40,
+        88,
+        predict_receiving_team_yards_to_goal(
+            data.rename(columns={
+                'yards_to_goal':'punt_team_end_yards_to_goal',
+                'pregame_offense_elo':'punting_team_pregame_elo',
+                'pregame_defense_elo':'receiving_team_pregame_elo',
+            })
+        )
     )
 
     LOG.info('Predicting win probabilities after punt.')
@@ -110,7 +116,7 @@ def compute_punt_eWP(data: pd.DataFrame) -> pd.DataFrame:
     probas[(wp_data['pct_game_played'] == 1.0) & ((-1 * wp_data['score_diff']) < 0)] = 0.0
 
     data['exp_wp_punt'] = np.round(probas, 4)
-    
+
     return data
 
 def predict_receiving_team_yards_to_goal(
@@ -125,7 +131,19 @@ def predict_receiving_team_yards_to_goal(
     Returns:
         pd.Series: Receiving team yards to goal predictions (values between 0 and 100).
     """
-    
+
+    feature_names = [  
+        'punt_team_end_yards_to_goal', 
+        'elevation',  
+        'temperature', 
+        'punting_team_pregame_elo', 
+        'receiving_team_pregame_elo',
+    ]
+    data = df[feature_names].copy()
+    lr_model = sm.load(LR_MODEL_PATH)
+    lr_preds = lr_model.predict(sm.add_constant(data))
+
+
     feature_names = [  
         'punt_team_end_yards_to_goal',
         'elevation', 
@@ -137,12 +155,12 @@ def predict_receiving_team_yards_to_goal(
     ]
     dmatrix = xgb.DMatrix(df[feature_names])
 
-    model = _load_model(MODEL_PATH)
-    preds = model.predict(dmatrix)
+    xgb_model = _load_model(XGB_MODEL_PATH)
+    xgb_preds = xgb_model.predict(dmatrix)
+
+    preds = 0.5 * (lr_preds + xgb_preds)
     
     return pd.Series(preds, index=df.index, name="receiving_team_yards_to_goal")
-
-
 
 def _load_model(model_path: str) -> xgb.Booster:
     model = xgb.Booster()
