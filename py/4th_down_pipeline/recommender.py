@@ -1,9 +1,6 @@
 from os.path import join
-import pickle
-import argparse
 import logging
 
-import numpy as np
 import pandas as pd
 
 from data_loader import data_loader as dl
@@ -79,22 +76,5 @@ def get_recommendations(
     data = field_goal.compute_field_goal_eWP(data)
     data = punt.compute_punt_eWP(data)
     data = fourth_down_attempt.compute_fourth_down_attempt_eWP(data)
-
+    data.to_csv(f'{year}_{week}_{season_type}.csv', index=False)
     return data
-
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Run 4th down recommender pipeline")
-    parser.add_argument("--year", type=int, required=True, help="Year of the season (e.g., 2025)")
-    parser.add_argument("--week", type=int, required=True, help="Week of the season")
-    parser.add_argument("--season_type", type=str, required=True, choices=["regular", "postseason"], help="Season type")
-    parser.add_argument("--force_data_update", type=lambda x: str(x).lower() == "true", default=False,
-                        help="Force refresh of data (default: False)")
-    
-    args = parser.parse_args()
-
-    data = get_recommendations(
-        year=args.year,
-        week=args.week,
-        season_type=args.season_type,
-        force_data_update=args.force_data_update,
-    )
