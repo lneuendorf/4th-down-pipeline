@@ -1,3 +1,4 @@
+import logging
 from os.path import join
 import pickle
 from sklearn.linear_model import LinearRegression
@@ -5,6 +6,12 @@ import pandas as pd
 import numpy as np
 
 MODEL_DIR = 'models'
+
+logging.basicConfig(
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', 
+    level=logging.INFO
+)
+LOG = logging.getLogger(__name__)
 
 def engineer_features(
     games: pd.DataFrame,
@@ -30,6 +37,8 @@ def engineer_features(
         pd.DataFrame: DataFrame with engineered features for 4th down decision making
     """
 
+    LOG.info("Engineering features for 4th down decision making model")
+    
     play_cols = [
         'game_id','drive_id','id','offense','defense','period','clock_minutes',
         'clock_seconds','offense_score','defense_score', 'offense_timeouts',

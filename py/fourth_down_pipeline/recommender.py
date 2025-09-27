@@ -1,8 +1,6 @@
 from os.path import join
 import logging
 
-import pandas as pd
-
 from data_loader import data_loader as dl
 from feature_engineering import feature_engineering as fe
 from feature_engineering.team_strength import impute_missing_team_strengths
@@ -12,6 +10,8 @@ from inference import(
     punt
 )
 
+OUTPUT_DIR = 'results'
+
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', 
     level=logging.INFO
@@ -19,12 +19,12 @@ logging.basicConfig(
 LOG = logging.getLogger(__name__)
 
 
-def get_recommendations(
+def generate_recommendations(
     year: int, 
     week: int, 
     season_type: str, 
     force_data_update: bool = False
-) -> pd.DataFrame:
+) -> None:
     """ Get 4th down recommendations for all games in a specific year, week, and season type """
     # Load all necessary data
     games = dl.load_games(year, week, season_type, force_data_update)
@@ -76,5 +76,30 @@ def get_recommendations(
     data = field_goal.compute_field_goal_eWP(data)
     data = punt.compute_punt_eWP(data)
     data = fourth_down_attempt.compute_fourth_down_attempt_eWP(data)
-    data.to_csv(f'{year}_{week}_{season_type}.csv', index=False)
-    return data
+
+    # Store results
+    cols = [
+        'season', 'week', 'season_type', 'game_id', 'play_id', 
+        'offense', 'offense_division', 'offense_timeouts', 'offense_score', 'offense_strength', 'pregame_offense_elo',
+        'defense', 'defense_division', 'defense_timeouts', 'defense_score', 'defense_strength', 'pregame_defense_elo',
+        'period', 'clock_minutes', 'clock_seconds', 'pct_game_played', 'pct_half_played', 
+        'game_seconds_remaining', 'seconds_left_in_half',
+        'seconds_after_kneelout', 'can_kneel_out',
+        'can_kneel_out_30', 'can_kneel_out_60', 'can_kneel_out_90', 
+        'play_type', 'play_text', 
+        'score_diff', 'pregame_elo_diff', 'pregame_spread', 
+        'diff_time_ratio', 'spread_time_ratio', 
+        'yards_to_goal', 'down', 'distance', 
+        'home_id', 'home_team', 'home_conference', 
+        'away_id', 'away_team', 'away_conference', 
+        'is_home_team', 
+        'home_division', 'home_pregame_elo',
+        'away_division', 'away_pregame_elo',
+        'precipitation', 'elevation', 'grass', 'wind_speed', 'temperature', 'game_indoors',
+        'pressure_rating', 
+        'fg_make_proba', 'wp_make_proba',
+        'wp_miss_proba', 'receiving_team_yards_to_goal',
+        'fourth_down_conversion_proba', 'wp_convert_proba',
+        'wp_fail_proba', 
+        'action','decision','exp_wp_fg','exp_wp_go', 'exp_wp_punt']
+    data[cols].to_parquet(join(OUTPUT_DIR, f'{year}_{week}_{season_type}.parquet'))

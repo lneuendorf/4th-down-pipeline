@@ -130,9 +130,15 @@ def predict_receiving_team_yards_to_goal(
         'punting_team_pregame_elo', 
         'receiving_team_pregame_elo',
     ]
-    data = df[feature_names].copy()
+    data = (
+        df[feature_names].copy()
+        .assign(const=1)
+        .set_index('const', append=True)
+        .reset_index()
+        .drop(columns=['level_0'])
+    )
     lr_model = sm.load(LR_MODEL_PATH)
-    lr_preds = lr_model.predict(sm.add_constant(data))
+    lr_preds = lr_model.predict(data)
 
 
     feature_names = [  

@@ -186,9 +186,15 @@ def predict_field_goal_make_probability(
         'game_indoors'
     ]
 
-    selection_df = df[selection_features]
+    selection_df = (
+        df[selection_features]
+        .assign(const=1)
+        .set_index('const', append=True)
+        .reset_index()
+        .drop(columns=['level_0'])
+    )
     selection_model = _load_model(SELECTION_MODEL_PATH)
-    df['probit_score'] = selection_model.predict(sm.add_constant(selection_df))
+    df['probit_score'] = selection_model.predict(selection_df)
     
     # Inverse Mills Ratio λ = φ / Φ
     W_gamma = df.probit_score
@@ -206,9 +212,15 @@ def predict_field_goal_make_probability(
         'elevation', 
         'lambda'
     ]
-    outcome_df = df[outcome_features]
+    outcome_df = (
+        df[outcome_features]
+        .assign(const=1)
+        .set_index('const', append=True)
+        .reset_index()
+        .drop(columns=['level_0'])
+    )
     outcome_model = _load_model(OUTCOME_MODEL_PATH)
-    preds = outcome_model.predict(sm.add_constant(outcome_df))
+    preds = outcome_model.predict(outcome_df)
 
     return pd.Series(preds, index=df.index, name="field_goal_probability")
 
