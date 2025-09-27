@@ -1,3 +1,4 @@
 config.json
 *.cpython*
 data
+results

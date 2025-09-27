@@ -2,7 +2,7 @@
 set -e
 
 # Defaults
-FORCE_DATA_UPDATE=false
+FORCE_DATA_UPDATE=False
 
 # Parse arguments
 while [[ "$#" -gt 0 ]]; do
@@ -10,7 +10,7 @@ while [[ "$#" -gt 0 ]]; do
         -y|--year) YEAR="$2"; shift ;;
         -w|--week) WEEK="$2"; shift ;;
         -s|--season_type) SEASON_TYPE="$2"; shift ;;
-        -f|--force) FORCE_DATA_UPDATE=true ;;
+        -f|--force) FORCE_DATA_UPDATE=True ;;
         *) echo "Unknown parameter passed: $1"; exit 1 ;;
     esac
     shift
@@ -25,7 +25,7 @@ fi
 # Setup Python path
 SCRIPT_DIR=$(dirname "$0")
 PROJECT_ROOT="$SCRIPT_DIR/.."
-export PYTHONPATH="$PROJECT_ROOT/py:$PYTHONPATH"
+export PYTHONPATH="$PROJECT_ROOT/py/fourth_down_pipeline:$PYTHONPATH"
 
 # Setup conda environment
 ENV_NAME="4thdown"
@@ -40,9 +40,16 @@ else
     conda activate "$ENV_NAME"
 fi
 
-# Run recommender
-python "$PROJECT_ROOT/py/4th_down_pipeline/recommender.py" \
+# Run job with force flag if needed
+FORCE_FLAG=""
+if [ "$FORCE_DATA_UPDATE" = "True" ]; then
+    FORCE_FLAG="--force"
+fi
+
+# Run as module
+python -m jobs \
+    --jobname week \
     --year "$YEAR" \
     --week "$WEEK" \
     --season_type "$SEASON_TYPE" \
-    $( [[ "$FORCE_DATA_UPDATE" == true ]] && echo "--force" )
+    $FORCE_FLAG
