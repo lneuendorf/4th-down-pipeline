@@ -1,3 +1,4 @@
+import logging
 import pickle
 from os.path import join
 import numpy as np
@@ -5,6 +6,12 @@ import pandas as pd
 from scipy.optimize import minimize
 
 MODEL_DIR = 'models'
+
+logging.basicConfig(
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', 
+    level=logging.INFO
+)
+LOG = logging.getLogger(__name__)
 
 def calculate_team_strengths(
     ppa: pd.DataFrame,
@@ -17,7 +24,7 @@ def calculate_team_strengths(
     # Convert season/week to a numerical value for sorting
     ppa = ppa.copy()
     if set(ppa['season_type'].unique().tolist()) != set(['regular', 'postseason']):
-        raise ValueError("PPA data must contain both 'regular' and 'postseason' season types")
+        LOG.warning("Season type data does not contain both 'regular' and 'postseason' values.")
     ppa['season_type_indicator'] = ppa['season_type'].apply(lambda x: 1 if x == 'regular' else 2)
     ppa['season_week'] = ppa['season'] * 1000 + ppa['season_type_indicator'] * 100 + ppa['week']
     season_type_indicator = 1 if season_type == 'regular' else 2
