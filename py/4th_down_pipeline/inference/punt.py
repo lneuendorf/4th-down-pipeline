@@ -4,6 +4,7 @@ import pandas as pd
 import numpy as np
 import statsmodels.api as sm
 from inference import win_probability
+from feature_engineering.feature_engineering import add_kneel_features
 
 XGB_MODEL_PATH = 'models/punt_yards_to_goal/xgb_classifier.json'
 LR_MODEL_PATH = 'models/punt_yards_to_goal/linear_regression_model.pkl'
@@ -31,6 +32,7 @@ def compute_punt_eWP(data: pd.DataFrame) -> pd.DataFrame:
 
     LOG.info('Predicting win probabilities after punt.')
     wp_features = [
+        'play_id',
         'score_diff',
         'diff_time_ratio',
         'spread_time_ratio',
@@ -44,10 +46,11 @@ def compute_punt_eWP(data: pd.DataFrame) -> pd.DataFrame:
         'yards_to_goal',
         'down',
         'distance',
-        'can_kneel_out',
-        'can_kneel_out_30',
-        'can_kneel_out_60',
-        'can_kneel_out_90',
+        'seconds_after_kneelout'
+        # 'can_kneel_out',
+        # 'can_kneel_out_30',
+        # 'can_kneel_out_60',
+        # 'can_kneel_out_90',
     ]
 
     five_seconds_pct = 5 / (15 * 60 * 4)
@@ -57,10 +60,10 @@ def compute_punt_eWP(data: pd.DataFrame) -> pd.DataFrame:
     #NOTE: this is WP of the team receiving the punt
     wp_data = (
         data.assign(
-            score_diff=lambda x: -x['score_diff'],
             diff_time_ratio=lambda x: (
                 (-x['score_diff']) * np.exp(4 * (3600 - np.maximum(x['game_seconds_remaining'] - 5, 0)) / 3600)
             ),
+            score_diff=lambda x: -x['score_diff'],
             spread_time_ratio=lambda x: (
                 (-x['pregame_spread']) * np.exp(-4 * (3600 - np.maximum(x['game_seconds_remaining'] - 5, 0)) / 3600)
             ),
@@ -68,6 +71,7 @@ def compute_punt_eWP(data: pd.DataFrame) -> pd.DataFrame:
             pregame_defense_elo_new=lambda x: x.pregame_offense_elo,
             pct_game_played=lambda x: np.minimum(x['pct_game_played'] + five_seconds_pct, 1.0),
             seconds_left_in_half=lambda x: np.maximum(x['seconds_left_in_half'] - 5, 0),
+            game_seconds_remaining=lambda x: np.maximum(x['game_seconds_remaining'] - 5, 0),
             pregame_spread=lambda x: -x['pregame_spread'],
             is_home_team=lambda x: np.select(
                 condlist=[x['is_home_team'] == 1, x['is_home_team'] == -1], 
@@ -79,18 +83,6 @@ def compute_punt_eWP(data: pd.DataFrame) -> pd.DataFrame:
             yards_to_goal=None,
             down=1,
             distance=10,
-            can_kneel_out=lambda x: np.where(
-                x.seconds_after_kneelout - 5 <= 0, 1, 0
-            ),
-            can_kneel_out_30=lambda x: np.where(
-                x.seconds_after_kneelout - 5 <= 30, 1, 0
-            ),
-            can_kneel_out_60=lambda x: np.where(
-                x.seconds_after_kneelout - 5 <= 60, 1, 0
-            ),
-            can_kneel_out_90=lambda x: np.where(
-                x.seconds_after_kneelout - 5 <= 90, 1, 0
-            )   
         )
         .drop(columns=['offense_timeouts','defense_timeouts'
                        ,'pregame_offense_elo', 'pregame_defense_elo'])
@@ -100,13 +92,12 @@ def compute_punt_eWP(data: pd.DataFrame) -> pd.DataFrame:
             'pregame_offense_elo_new':'pregame_offense_elo',
             'pregame_defense_elo_new':'pregame_defense_elo'
         })
-        [wp_features]
     )
 
-    # Any potential punt inside the 40 yard line is assumed to be downed at the 89 yard line
-    data.loc[data.yards_to_goal < 40, 'punt_yards_to_goal'] = 89
+    wp_data = add_kneel_features(wp_data)
 
-    wp_data['yards_to_goal'] = data['punt_yards_to_goal']
+    wp_data['yards_to_goal'] = data['receiving_team_yards_to_goal']
+    wp_data = wp_data[wp_features]
 
     # the "1 -" here is to flip the WP back to the team that is punting
     probas = (1 - win_probability.predict_win_probability(wp_data))

@@ -4,6 +4,7 @@ import numpy as np
 import statsmodels.api as sm
 from scipy.stats import norm
 from inference import win_probability
+from feature_engineering.feature_engineering import add_kneel_features
 
 SELECTION_MODEL_PATH = 'models/fg_probability/selection_model.pkl'
 OUTCOME_MODEL_PATH = 'models/fg_probability/outcome_model.pkl'
@@ -46,10 +47,11 @@ def compute_field_goal_eWP(data: pd.DataFrame) -> pd.DataFrame:
         'yards_to_goal',
         'down',
         'distance',
-        'can_kneel_out',
-        'can_kneel_out_30',
-        'can_kneel_out_60',
-        'can_kneel_out_90',
+        'seconds_after_kneelout'
+        # 'can_kneel_out',
+        # 'can_kneel_out_30',
+        # 'can_kneel_out_60',
+        # 'can_kneel_out_90',
     ]
 
     five_seconds_pct = 5 / (15 * 60 * 4)
@@ -60,10 +62,10 @@ def compute_field_goal_eWP(data: pd.DataFrame) -> pd.DataFrame:
     #NOTE: this is WP team of the team NOT kicking the FG
     wp_make_data = (
         data.assign(
-            score_diff=lambda x: -x['score_diff'] - 3,
             diff_time_ratio=lambda x: (
                 (-x['score_diff'] - 3) * np.exp(4 * (3600 - np.maximum(x['game_seconds_remaining'] - 5, 0)) / 3600)
             ),
+            score_diff=lambda x: -x['score_diff'] - 3,
             spread_time_ratio=lambda x: (
                 (-x['pregame_spread']) * np.exp(-4 * (3600 - np.maximum(x['game_seconds_remaining'] - 5, 0)) / 3600)
             ),
@@ -71,24 +73,13 @@ def compute_field_goal_eWP(data: pd.DataFrame) -> pd.DataFrame:
             pregame_defense_elo_new=lambda x: x.pregame_offense_elo,
             pct_game_played=lambda x: np.minimum(x['pct_game_played'] + five_seconds_pct, 1.0),
             seconds_left_in_half=lambda x: np.maximum(x['seconds_left_in_half'] - 5, 0),
+            game_seconds_remaining=lambda x: np.maximum(x['game_seconds_remaining'] - 5, 0),
             is_home_team=lambda x: np.select([x['is_home_team'] == 1, x['is_home_team'] == -1], [-1, 1], default=0),
             offense_timeouts_new=lambda x: x.defense_timeouts,
             defense_timeouts_new=lambda x: x.offense_timeouts,
             yards_to_goal=80,
             down=1,
-            distance=10,
-            can_kneel_out=lambda x: np.where(
-                x.seconds_after_kneelout - 5 <= 0, 1, 0
-            ),
-            can_kneel_out_30=lambda x: np.where(
-                x.seconds_after_kneelout - 5 <= 30, 1, 0
-            ),
-            can_kneel_out_60=lambda x: np.where(
-                x.seconds_after_kneelout - 5 <= 60, 1, 0
-            ),
-            can_kneel_out_90=lambda x: np.where(
-                x.seconds_after_kneelout - 5 <= 90, 1, 0
-            )
+            distance=10
 
         )
         .drop(columns=['offense_timeouts','defense_timeouts',
@@ -99,8 +90,10 @@ def compute_field_goal_eWP(data: pd.DataFrame) -> pd.DataFrame:
             'pregame_offense_elo_new':'pregame_offense_elo',
             'pregame_defense_elo_new':'pregame_defense_elo'
         })
-        [wp_features]
     )
+
+    wp_make_data = add_kneel_features(wp_make_data)
+    wp_make_data = wp_make_data[wp_features]
 
     # the "1 -" here is to flip the WP back to the team that is kicking the FG
     probas = 1 - win_probability.predict_win_probability(wp_make_data)
@@ -116,10 +109,10 @@ def compute_field_goal_eWP(data: pd.DataFrame) -> pd.DataFrame:
     #NOTE: this is WP team of the team NOT kicking the FG
     wp_miss_data = (
         data.assign(
-            score_diff=lambda x: (-1 * x['score_diff']),
             diff_time_ratio=lambda x: (
                 (-x['score_diff']) * np.exp(4 * (3600 - np.maximum(x['game_seconds_remaining'] - 5, 0)) / 3600)
             ),
+            score_diff=lambda x: (-1 * x['score_diff']),
             spread_time_ratio=lambda x: (
                 (-x['pregame_spread']) * np.exp(-4 * (3600 - np.maximum(x['game_seconds_remaining'] - 5, 0)) / 3600)
             ),
@@ -132,19 +125,7 @@ def compute_field_goal_eWP(data: pd.DataFrame) -> pd.DataFrame:
             defense_timeouts_new=lambda x: x.offense_timeouts,
             yards_to_goal=lambda x: 100 - x['yards_to_goal'],
             down=1,
-            distance=10,
-            can_kneel_out=lambda x: np.where(
-                x.seconds_after_kneelout - 5 <= 0, 1, 0
-            ),
-            can_kneel_out_30=lambda x: np.where(
-                x.seconds_after_kneelout - 5 <= 30, 1, 0
-            ),
-            can_kneel_out_60=lambda x: np.where(
-                x.seconds_after_kneelout - 5 <= 60, 1, 0
-            ),
-            can_kneel_out_90=lambda x: np.where(
-                x.seconds_after_kneelout - 5 <= 90, 1, 0
-            )
+            distance=10
         )
         .drop(columns=['offense_timeouts','defense_timeouts',
                        'pregame_offense_elo', 'pregame_defense_elo'])
@@ -154,8 +135,10 @@ def compute_field_goal_eWP(data: pd.DataFrame) -> pd.DataFrame:
             'pregame_offense_elo_new':'pregame_offense_elo',
             'pregame_defense_elo_new':'pregame_defense_elo'
         })
-        [wp_features]
     )
+
+    wp_miss_data = add_kneel_features(wp_miss_data)
+    wp_miss_data = wp_miss_data[wp_features]
 
     # the "1 -" here is to flip the WP back to the team that is kicking the FG
     probas = 1 - win_probability.predict_win_probability(wp_miss_data)

@@ -30,10 +30,11 @@ def predict_win_probability(
         'yards_to_goal',
         'down',
         'distance',
-        'can_kneel_out',
-        'can_kneel_out_30',
-        'can_kneel_out_60',
-        'can_kneel_out_90',
+        'seconds_after_kneelout'
+        # 'can_kneel_out',
+        # 'can_kneel_out_30',
+        # 'can_kneel_out_60',
+        # 'can_kneel_out_90',
     ]
     dmatrix = xgb.DMatrix(df[feature_names])
 

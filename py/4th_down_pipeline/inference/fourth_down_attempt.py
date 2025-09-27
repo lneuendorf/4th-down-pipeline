@@ -3,6 +3,7 @@ import xgboost as xgb
 import pandas as pd
 import numpy as np
 from inference import win_probability
+from feature_engineering.feature_engineering import add_kneel_features
 
 MODEL_PATH = 'models/fourth_down/xgb_classifier.json'
 
@@ -32,10 +33,11 @@ def compute_fourth_down_attempt_eWP(data: pd.DataFrame) -> pd.DataFrame:
         'yards_to_goal',
         'down',
         'distance',
-        'can_kneel_out',
-        'can_kneel_out_30',
-        'can_kneel_out_60',
-        'can_kneel_out_90',
+        'seconds_after_kneelout'
+        # 'can_kneel_out',
+        # 'can_kneel_out_30',
+        # 'can_kneel_out_60',
+        # 'can_kneel_out_90',
     ]
 
     five_seconds_pct = 5 / (15 * 60 * 4)
@@ -49,15 +51,15 @@ def compute_fourth_down_attempt_eWP(data: pd.DataFrame) -> pd.DataFrame:
     wp_convert_data = (
         data
         .assign(
-            score_diff=lambda x: np.where(
-                x.yards_to_goal <= x.distance,  # if scored touchdown
-                (-1 * x['score_diff']) - 7, # flip defense to offense team
-                x['score_diff']
-            ),
             diff_time_ratio=lambda x: np.where(
                 x.yards_to_goal <= x.distance, # if scored touchdown
                 (-x['score_diff'] - 7) * np.exp(4 * (3600 - np.maximum(x['game_seconds_remaining'] - 5, 0)) / 3600),
                 (x['score_diff']) * np.exp(4 * (3600 - np.maximum(x['game_seconds_remaining'] - 5, 0)) / 3600)
+            ),
+            score_diff=lambda x: np.where(
+                x.yards_to_goal <= x.distance,  # if scored touchdown
+                (-1 * x['score_diff']) - 7, # flip defense to offense team
+                x['score_diff']
             ),
             spread_time_ratio=lambda x: np.where(
                 x.yards_to_goal <= x.distance,  # if scored touchdown
@@ -68,6 +70,7 @@ def compute_fourth_down_attempt_eWP(data: pd.DataFrame) -> pd.DataFrame:
             pregame_defense_elo_new=lambda x: x.pregame_defense_elo,
             pct_game_played=lambda x: np.minimum(x['pct_game_played'] + five_seconds_pct, 1.0),
             seconds_left_in_half=lambda x: np.maximum(x['seconds_left_in_half'] - 5, 0),
+            game_seconds_remaining=lambda x: np.maximum(x['game_seconds_remaining'] - 5, 0),
             is_home_team=lambda x: np.where(
                 x.yards_to_goal <= x.distance, # if scored touchdown
                 np.select([x['is_home_team'] == 1, x['is_home_team'] == -1], [-1, 1], default=0), 
@@ -89,19 +92,7 @@ def compute_fourth_down_attempt_eWP(data: pd.DataFrame) -> pd.DataFrame:
                 x['yards_to_goal'] - x['distance']
             ),
             down=1,
-            distance=10,
-            can_kneel_out=lambda x: np.where(
-                x.seconds_after_kneelout - 5 <= 0, 1, 0
-            ),
-            can_kneel_out_30=lambda x: np.where(
-                x.seconds_after_kneelout - 5 <= 30, 1, 0
-            ),
-            can_kneel_out_60=lambda x: np.where(
-                x.seconds_after_kneelout - 5 <= 60, 1, 0
-            ),
-            can_kneel_out_90=lambda x: np.where(
-                x.seconds_after_kneelout - 5 <= 90, 1, 0
-            )
+            distance=10
         )
         .drop(columns=['offense_timeouts', 'defense_timeouts'
                        ,'pregame_offense_elo', 'pregame_defense_elo'])
@@ -111,8 +102,10 @@ def compute_fourth_down_attempt_eWP(data: pd.DataFrame) -> pd.DataFrame:
             'pregame_offense_elo_new': 'pregame_offense_elo',
             'pregame_defense_elo_new': 'pregame_defense_elo'
         })
-        [wp_features]
     )
+    
+    wp_convert_data = add_kneel_features(wp_convert_data)
+    wp_convert_data = wp_convert_data[wp_features]
 
     # If the conversion leads to a TD, then flip the WP back from defense to offense
     probas = win_probability.predict_win_probability(wp_convert_data)
@@ -145,10 +138,10 @@ def compute_fourth_down_attempt_eWP(data: pd.DataFrame) -> pd.DataFrame:
     wp_fail_data = (
         data
         .assign(
-            score_diff=lambda x: x.score_diff * -1,
             diff_time_ratio=lambda x: (
                 (-x['score_diff'] * np.exp(4 * (3600 - np.maximum(x['game_seconds_remaining'] - 5, 0)) / 3600))
             ),
+            score_diff=lambda x: x.score_diff * -1,
             spread_time_ratio=lambda x: (
                 (-x['pregame_spread']) * np.exp(-4 * (3600 - np.maximum(x['game_seconds_remaining'] - 5, 0)) / 3600)
             ),
@@ -156,6 +149,7 @@ def compute_fourth_down_attempt_eWP(data: pd.DataFrame) -> pd.DataFrame:
             pregame_defense_elo_new=lambda x: x.pregame_offense_elo,
             pct_game_played=lambda x: np.minimum(x['pct_game_played'] + five_seconds_pct, 1.0),
             seconds_left_in_half=lambda x: np.maximum(x['seconds_left_in_half'] - 5, 0),
+            game_seconds_remaining=lambda x: np.maximum(x['game_seconds_remaining'] - 5, 0),
             is_home_team=lambda x: np.select(
                 condlist=[x['is_home_team'] == 1, x['is_home_team'] == -1], 
                 choicelist=[-1, 1], 
@@ -165,19 +159,7 @@ def compute_fourth_down_attempt_eWP(data: pd.DataFrame) -> pd.DataFrame:
             defense_timeouts_new=lambda x: x.offense_timeouts,
             yards_to_goal=lambda x: 100 - x['yards_to_goal'],
             down=1,
-            distance=10,
-            can_kneel_out=lambda x: np.where(
-                x.seconds_after_kneelout - 5 <= 0, 1, 0
-            ),
-            can_kneel_out_30=lambda x: np.where(
-                x.seconds_after_kneelout - 5 <= 30, 1, 0
-            ),
-            can_kneel_out_60=lambda x: np.where(
-                x.seconds_after_kneelout - 5 <= 60, 1, 0
-            ),
-            can_kneel_out_90=lambda x: np.where(
-                x.seconds_after_kneelout - 5 <= 90, 1, 0
-            )
+            distance=10
         )
         .drop(columns=['offense_timeouts','defense_timeouts'
                        ,'pregame_offense_elo', 'pregame_defense_elo'])
@@ -187,8 +169,9 @@ def compute_fourth_down_attempt_eWP(data: pd.DataFrame) -> pd.DataFrame:
             'pregame_offense_elo_new':'pregame_offense_elo',
             'pregame_defense_elo_new':'pregame_defense_elo'
         })
-        [wp_features]
     )
+    wp_fail_data = add_kneel_features(wp_fail_data)
+    wp_fail_data = wp_fail_data[wp_features]
     # the "1 -" here is to flip the WP back to the team that is attempting the 4th down
     probas = (1 - win_probability.predict_win_probability(wp_fail_data))
     # Set WP to 1 or 0 if the game is over after the FG

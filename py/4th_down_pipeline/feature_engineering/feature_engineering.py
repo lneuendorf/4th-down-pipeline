@@ -80,6 +80,11 @@ def engineer_features(
                 choicelist=[0, 1], 
                 default=-1
             ),
+            pct_half_played=lambda x: np.where(
+                x.period <= 2,
+                x.pct_game_played,
+                x.pct_game_played - 0.5
+            )
         )
         .merge(
             venues[venue_cols].rename(columns={'id':'venue_id'}),
@@ -181,7 +186,31 @@ def engineer_features(
         ),
         defense_timeouts = np.minimum(np.maximum(data.defense_timeouts, 0), 3),
         offense_timeouts = np.minimum(np.maximum(data.offense_timeouts, 0), 3),
+    ).assign(
+        offense_timeouts=lambda x: np.select(
+            [
+                x.offense_timeouts.isna() & x.period.isin([1, 2, 3, 4]),
+                x.offense_timeouts.isna() & ~x.period.isin([1, 2, 3, 4])
+            ],
+            [
+                np.floor(-2.4387 * x.pct_half_played + 3.1631).astype(int),
+                0
+            ],
+            default=x.offense_timeouts
+        ),
+        defense_timeouts=lambda x: np.select(
+            [
+                x.defense_timeouts.isna() & x.period.isin([1, 2, 3, 4]),
+                x.defense_timeouts.isna() & ~x.period.isin([1, 2, 3, 4])
+            ],
+            [
+                np.floor(-2.4387 * x.pct_half_played + 3.1631).astype(int),
+                0
+            ],
+            default=x.defense_timeouts
+        )
     )
+
     data['elevation'] = data['elevation'].astype(float)   
 
     data = _impute_point_spread(data) 
@@ -238,7 +267,7 @@ def engineer_features(
         )
     )
 
-    data = _add_kneel_features(data)
+    data = add_kneel_features(data)
 
     return data
 
@@ -335,7 +364,7 @@ def add_decision(data: pd.DataFrame) -> pd.DataFrame:
 
     return data
 
-def _add_kneel_features(data: pd.DataFrame) -> pd.DataFrame:
+def add_kneel_features(data: pd.DataFrame) -> pd.DataFrame:
     def seconds_after_kneelout(row, play_clock=40, kneel_duration=2):
         """
         Returns the number of seconds remaining after the offense kneels out the game,
@@ -343,17 +372,19 @@ def _add_kneel_features(data: pd.DataFrame) -> pd.DataFrame:
         """
         seconds = row['game_seconds_remaining']
         timeouts = row['defense_timeouts']
-        downs_remaining = 4 - row['down'] + 1
+        downs_remaining = 4 - row['down']
         prior_to_two_minute = seconds > 120
             
         while seconds > 0 and downs_remaining > 0:
             # Add kneel duration first
             seconds -= kneel_duration
             
-            if timeouts > 0:
+            if prior_to_two_minute and seconds <= 120:
+                prior_to_two_minute = False
+            elif timeouts > 0:
                 timeouts -= 1
             else:
-                if prior_to_two_minute and 119 <= seconds and seconds <= (120 + play_clock):
+                if prior_to_two_minute and seconds <= (120 + play_clock):
                     prior_to_two_minute = False
                     seconds = 120
                 else:
