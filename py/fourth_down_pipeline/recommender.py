@@ -42,7 +42,7 @@ def generate_recommendations(
     data = (
         data
         .query('~((action == "field_goal") & (yards_to_goal > 60))')
-        .query('offense_division == "fbs" or defense_division == "fbs"')
+        .query('offense_division == "fbs"') # Only FBS teams
         .reset_index(drop=True)
     )
 
