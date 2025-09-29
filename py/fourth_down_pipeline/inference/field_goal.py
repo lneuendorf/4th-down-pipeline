@@ -20,14 +20,14 @@ def compute_field_goal_eWP(data: pd.DataFrame) -> pd.DataFrame:
     LOG.info('Predicing field goal make probability.')
     data['fg_make_proba'] = predict_field_goal_make_probability(data)
     # Hardcoded probabilities for long FG attempts
+    data['kick_distance'] = data['yards_to_goal'] + 17
     rules = [
-        ('50 <= yards_to_goal <= 52', 0.15),
-        ('53 <= yards_to_goal <= 55', 0.11),
-        ('56 <= yards_to_goal <= 58', 0.07),
-        ('59 <= yards_to_goal <= 61', 0.03),
-        ('62 <= yards_to_goal <= 64', 0.01),
-        ('65 <= yards_to_goal <= 70', 0.0001),
-        ('yards_to_goal > 70', 0.0)
+        ('55 <= kick_distance < 57', 0.08),
+        ('57 <= kick_distance < 59', 0.05),
+        ('59 <= kick_distance < 61', 0.02),
+        ('61 <= kick_distance < 65', 0.01),
+        ('65 <= kick_distance <= 70', 0.005),
+        ('kick_distance > 70', 0.0)
     ]
     for rule, base_prob in rules:
         data.loc[data.query(rule).index, 'fg_make_proba'] = base_prob
@@ -102,8 +102,8 @@ def compute_field_goal_eWP(data: pd.DataFrame) -> pd.DataFrame:
     probas[(wp_make_data['pct_game_played'] == 1.0) & ((-1 * wp_make_data['score_diff']) > 0)] = 1.0
     probas[(wp_make_data['pct_game_played'] == 1.0) & ((-1 * wp_make_data['score_diff']) < 0)] = 0.0
 
-    # round probas to 3 decimal places
-    data['wp_make_proba'] = np.round(probas, 3)
+    # round probas to 4 decimal places
+    data['wp_make_proba'] = np.round(probas, 4)
 
     LOG.info('Predicting win probabilities after FG miss.')
     #NOTE: this is WP team of the team NOT kicking the FG
@@ -147,8 +147,8 @@ def compute_field_goal_eWP(data: pd.DataFrame) -> pd.DataFrame:
     probas[(wp_miss_data['pct_game_played'] == 1.0) & ((-1 * wp_miss_data['score_diff']) > 0)] = 1.0
     probas[(wp_miss_data['pct_game_played'] == 1.0) & ((-1 * wp_miss_data['score_diff']) < 0)] = 0.0
 
-    # round probas to 3 decimal places
-    data['wp_miss_proba'] = np.round(probas, 3)
+    # round probas to 4 decimal places
+    data['wp_miss_proba'] = np.round(probas, 4)
 
     data['exp_wp_fg'] = (
         (data['fg_make_proba'] * data['wp_make_proba']) + 
