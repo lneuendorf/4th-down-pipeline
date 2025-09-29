@@ -177,7 +177,6 @@ def predict_field_goal_make_probability(
         'pregame_offense_elo', 
         'pregame_defense_elo', 
         'distance', 
-        'pressure_rating', 
         'is_home_team',
         'wind_speed', 
         'temperature',
@@ -202,11 +201,12 @@ def predict_field_goal_make_probability(
     Phi = norm.cdf(W_gamma)
     df['lambda'] = phi / Phi
 
+    df['yards_to_goal_squared'] = df['yards_to_goal'] ** 2
     outcome_features = [
-        'yards_to_goal', 
-        'score_diff', 
+        'season',
+        'yards_to_goal_squared',  
         'pregame_offense_elo', 
-        'pregame_defense_elo', 
+        'pregame_defense_elo',
         'pressure_rating',
         'wind_speed', 
         'elevation', 
