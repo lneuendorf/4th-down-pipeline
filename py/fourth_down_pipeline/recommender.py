@@ -34,6 +34,8 @@ def generate_recommendations(
     lines = dl.load_lines(year, week, season_type, force_data_update)
     elo = dl.load_elo(year, week, season_type, force_data_update)
     team_strengths = dl.load_team_strengths(year, week, season_type, force_data_update)
+    teams = dl.load_teams(year, force_data_update)
+    coaches = dl.load_coaches(year, force_data_update)
 
     data = fe.engineer_features(games, plays, weather, venues, lines, elo, team_strengths)
     data = fe.add_decision(data)

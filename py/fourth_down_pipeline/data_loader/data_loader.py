@@ -300,6 +300,55 @@ def load_teams(
     teams.to_parquet(file_path)
     return teams
 
+# df_coaches.head()
+def load_coaches(
+    year: int,
+    force_data_update: bool = False
+) -> pd.DataFrame:
+    """Load coaches data for a specific year, week, and season type from CFBD API.
+
+    Args:
+        year (int): Year of the season (e.g., 2023) 
+        force_data_update (bool): If True, forces data to be fetched from API even 
+            if cached data exists.
+
+    Returns:
+        pd.DataFrame: DataFrame containing coach information
+    """
+    coaches_dir = join(DATA_PATH, 'coaches')
+    os.makedirs(coaches_dir, exist_ok=True)
+    file_path = join(coaches_dir, f'{year}.parquet')
+
+    if os.path.exists(file_path) and not force_data_update:
+        LOG.info(f'Reading {year} coaches data from cached data')
+        coaches = pd.read_parquet(file_path)
+        if not coaches.query('season == @year').empty:
+            return coaches[coaches['season'] == year].reset_index(drop=True)
+        LOG.info(f'Missing {year} coaches')
+    LOG.info(f'Fetching {year} coaches data from CFBD API')
+
+    with cfbd.ApiClient(configuration) as api_client:
+        api_instance = cfbd.CoachesApi(api_client)
+        data = api_instance.get_coaches(year=year)
+    coaches = pd.DataFrame([val.to_dict() for val in data])
+    # convert season list column with json inside to individual columns
+    coaches = pd.concat([
+        coaches.explode('seasons').reset_index(drop=True).drop(columns=['seasons']), 
+        pd.json_normalize(coaches.explode('seasons').reset_index(drop=True)['seasons'])
+    ], axis=1)
+    coaches.columns = _convert_to_snake_case(coaches.columns)
+    coaches.insert(0, 'season', year)
+    coach_cols = ['first_name','last_name','school','season','hire_date']
+    coaches = (
+        coaches[coach_cols].drop_duplicates().reset_index(drop=True)
+        .assign(
+            coach_name=lambda x: x.first_name + ' ' + x.last_name,
+        ).drop(columns=['first_name','last_name'])
+    )
+
+    coaches.to_parquet(file_path)
+    return coaches
+
 def load_weather(
     year: int, 
     week: int, 
