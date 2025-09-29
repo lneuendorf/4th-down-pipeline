@@ -73,7 +73,7 @@ def engineer_features(
                                     ) / (15 * 60 * 4),
             score_diff=lambda x: x['offense_score'] - x['defense_score'],
         )
-        .query('0 < period <= 4')
+        .query('0 < period <= 4') # only regulation
         .query('0 <= yards_to_goal <= 100')
         .query('0 <= distance <= 100')
         # .drop(columns=['period','clock_minutes','clock_seconds'])
@@ -150,24 +150,6 @@ def engineer_features(
         )
     )
 
-    data['pressure_rating'] = np.select(
-        [
-            # tie or take the lead, last 2 min
-            (data['pct_game_played'] >= (58 / 60)) & (data['score_diff'] >= -3) & (data['score_diff'] <= 0),
-
-            # tie or take the lead, last 5 - 2 min
-            (data['pct_game_played'] >= (55 / 60)) & (data['score_diff'] >= -3) & (data['score_diff'] <= 0),
-
-            # tie or take the lead, last 10 - 5 min
-            (data['pct_game_played'] >= (50 / 60)) & (data['score_diff'] >= -3) & (data['score_diff'] <= 0),
-            
-            # tie or take the lead, last 15 - 10 min
-            (data['pct_game_played'] >= (45 / 60)) & (data['score_diff'] >= -3) & (data['score_diff'] <= 0),
-        ],
-        [4, 3, 2, 1],
-        default=0
-    )
-
     data = data.assign(
         offense_division = np.where(
             data['offense'] == data['home_team'], 
@@ -181,7 +163,11 @@ def engineer_features(
         ),
         grass = data.grass.fillna(False),
         game_indoors = data.game_indoors.fillna(False),
-        temperature = data.temperature.fillna(int(data.temperature.mean())),
+        temperature = np.where(
+            data.game_indoors,
+            70,
+            data.temperature.fillna(int(data.temperature.mean()))
+        ),
         wind_speed = np.where(
             data.game_indoors, 
             0, 
@@ -277,6 +263,8 @@ def engineer_features(
     )
 
     data = add_kneel_features(data)
+
+    data = add_fg_pressure_rating(data)
 
     return data
 
@@ -408,6 +396,44 @@ def add_kneel_features(data: pd.DataFrame) -> pd.DataFrame:
     data['can_kneel_out_30'] = data.seconds_after_kneelout <= 30
     data['can_kneel_out_60'] = data.seconds_after_kneelout <= 60
     data['can_kneel_out_90'] = data.seconds_after_kneelout <= 90
+
+    return data
+
+def add_fg_pressure_rating(data: pd.DataFrame) -> pd.DataFrame:
+    data['pressure_rating'] = np.select(
+        [
+            # tie or take the lead, last 2 min or OT
+            (
+                ((data['game_seconds_remaining'] <= 120) | (data['period'] > 4)) & 
+                (data['score_diff'] >= -3) & (data['score_diff'] <= 0)
+            ), 
+
+            # (tie or take the lead, last 5 - 2 min) or (stay within one score, last 2 min)
+            (
+                ((data['game_seconds_remaining'] <= 300) & (data['score_diff'] >= -3) & (data['score_diff'] <= 0)) |
+                ((data['game_seconds_remaining'] <= 120) & (data['score_diff'] >= -11) & (data['score_diff'] <= -4))
+            ),
+
+            # (tie or take the lead, last 10 - 5 min) or (stay within one score, last 5 min)
+            (
+                ((data['game_seconds_remaining'] <= 600) & (data['score_diff'] >= -3) & (data['score_diff'] <= 0)) |
+                ((data['game_seconds_remaining'] <= 300) & (data['score_diff'] >= -11) & (data['score_diff'] <= -4))
+            ),
+
+            # (tie or take the lead, last 15 - 10 min) or (stay within one score, last 10 min)
+            (
+                ((data['game_seconds_remaining'] <= 900) & (data['score_diff'] >= -3) & (data['score_diff'] <= 0)) |
+                ((data['game_seconds_remaining'] <= 600) & (data['score_diff'] >= -11) & (data['score_diff'] <= -4))
+            ),
+
+            # stay within one score, last 15 min
+            (
+                (data['game_seconds_remaining'] <= 900) & (data['score_diff'] >= -11) & (data['score_diff'] <= -4)
+            )
+        ],
+        [4, 3, 2, 1, 0.5],
+        default=0
+    )
 
     return data
 
