@@ -1,5 +1,6 @@
 from os.path import join
 import logging
+import os
 
 from data_loader import data_loader as dl
 from feature_engineering import feature_engineering as fe
@@ -34,8 +35,6 @@ def generate_recommendations(
     lines = dl.load_lines(year, week, season_type, force_data_update)
     elo = dl.load_elo(year, week, season_type, force_data_update)
     team_strengths = dl.load_team_strengths(year, week, season_type, force_data_update)
-    teams = dl.load_teams(year, force_data_update)
-    coaches = dl.load_coaches(year, force_data_update)
 
     data = fe.engineer_features(games, plays, weather, venues, lines, elo, team_strengths)
     data = fe.add_decision(data)
@@ -79,9 +78,18 @@ def generate_recommendations(
     data = punt.compute_punt_eWP(data)
     data = fourth_down_attempt.compute_fourth_down_attempt_eWP(data)
 
+    # Add start_date to data
+    data = data.merge(
+        games[['id', 'start_date']].rename(columns={'id':'game_id'}), 
+        on='game_id', 
+        how='left'
+    )
+
     # Store results
+    if not os.path.exists(OUTPUT_DIR):
+        os.makedirs(OUTPUT_DIR)
     cols = [
-        'season', 'week', 'season_type', 'game_id', 'play_id', 
+        'season', 'week', 'season_type', 'start_date', 'game_id', 'play_id', 
         'offense', 'offense_division', 'offense_timeouts', 'offense_score', 'offense_strength', 'pregame_offense_elo',
         'defense', 'defense_division', 'defense_timeouts', 'defense_score', 'defense_strength', 'pregame_defense_elo',
         'period', 'clock_minutes', 'clock_seconds', 'pct_game_played', 'pct_half_played', 
@@ -105,3 +113,5 @@ def generate_recommendations(
         'wp_fail_proba', 
         'action','decision','exp_wp_fg','exp_wp_go', 'exp_wp_punt']
     data[cols].to_parquet(join(OUTPUT_DIR, f'{year}_{week}_{season_type}.parquet'))
+
+    return data[cols]

@@ -2,7 +2,8 @@ import pandas as pd
 import argparse
 
 import recommender
-from data_loader.data_loader import load_games
+from data_loader.data_loader import load_games, load_teams, load_coaches
+from postprocessing.postprocessing import postprocess
 
 def get_recommendations_for_week(
     year: int, 
@@ -10,7 +11,8 @@ def get_recommendations_for_week(
     season_type: str, 
     force_data_update: bool = False
 ) -> None:
-    recommender.generate_recommendations(year, week, season_type, force_data_update)
+    result = recommender.generate_recommendations(year, week, season_type, force_data_update)
+    return result
 
 def get_recommendations_for_season_range(
     start_year: int, 
@@ -31,13 +33,34 @@ def get_recommendations_for_season_range(
         .drop_duplicates(ignore_index=True)
     )
 
+    results = []
     for _, row in games.iterrows():
-        get_recommendations_for_week(
-            year=row['season'], 
-            week=row['week'], 
-            season_type=row['season_type'], 
-            force_data_update=force_data_update
+        results.append(
+            get_recommendations_for_week(
+                year=row['season'], 
+                week=row['week'], 
+                season_type=row['season_type'], 
+                force_data_update=force_data_update
+            )
         )
+    results = pd.concat(results, ignore_index=True)
+
+    postprocess_all_recommendations(results, start_year, end_year)
+
+def postprocess_all_recommendations(
+        results: pd.DataFrame,
+        start_year: int = None,
+        end_year: int = None
+    ) -> None:
+    teams = []
+    coaches = []
+    for year in range(start_year, end_year + 1):
+        teams.append(load_teams(year))
+        coaches.append(load_coaches(year))
+    teams = pd.concat(teams, ignore_index=True)
+    coaches = pd.concat(coaches, ignore_index=True)
+
+    results = postprocess(results, teams, coaches)
 
 def main():
     parser = argparse.ArgumentParser(description='Fourth Down Pipeline Jobs')
