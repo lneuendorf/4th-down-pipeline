@@ -571,7 +571,7 @@ def load_ppa(
                 LOG.info(f'Missing up to current week {current_week}, fetching from CFBD API')
             else:
                 return ppa.reset_index(drop=True)
-        if not ppa.query('season_type == @season_type and week == @week').empty:
+        elif not ppa.query('season_type == @season_type and week == @week').empty:
             return ppa[
                 (ppa['week'] == week) &
                 (ppa['season_type'] == season_type)
@@ -657,9 +657,13 @@ def load_elo(
 
     years = range(1930, year + 1)
     games, teams = [], []
-    for year in years:
-        games.append(load_games(year, force_data_update=force_data_update))
-        teams.append(load_teams(year, force_data_update=force_data_update))
+    for yr in years:
+        if yr == year:
+            games.append(load_games(yr, force_data_update=True))
+            teams.append(load_teams(yr, force_data_update=True))
+        else:
+            games.append(load_games(yr, force_data_update=force_data_update))
+            teams.append(load_teams(yr, force_data_update=force_data_update))
     games = pd.concat(games, ignore_index=True)
     teams = pd.concat(teams, ignore_index=True)
 

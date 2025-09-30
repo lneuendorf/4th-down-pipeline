@@ -4,7 +4,7 @@ import numpy as np
 
 APP_DATA_DIR = '../app/data'
 
-def postprocess(
+def postprocess_results(
     data: pd.DataFrame,
     teams: pd.DataFrame,
     coaches: pd.DataFrame,
@@ -25,9 +25,9 @@ def postprocess(
     data = (
         data.assign(
             offense_id = np.where(data.home_team == data.offense, data.home_id, data.away_id),
-            offense_conference = np.where(data.home_team == data.offense, data.home_division, data.away_division),
+            offense_conference = np.where(data.home_team == data.offense, data.home_conference, data.away_conference),
             defense_id = np.where(data.home_team == data.defense, data.home_id, data.away_id),
-            defense_conference = np.where(data.home_team == data.defense, data.home_division, data.away_division),
+            defense_conference = np.where(data.home_team == data.defense, data.home_conference, data.away_conference),
         )[data_cols]
         .merge(
             teams[team_cols].add_prefix('offense_'),
@@ -45,6 +45,10 @@ def postprocess(
             'offense': 'offense_team',
             'defense': 'defense_team',
         })
+        .assign(
+            offense_logos=lambda x: x['offense_logos'].str[0],
+            defense_logos=lambda x: x['defense_logos'].str[0],
+        )
         .assign(
             offense_color=lambda x: x['offense_color'].astype(str),
             offense_alternate_color=lambda x: x['offense_alternate_color'].astype(str),
