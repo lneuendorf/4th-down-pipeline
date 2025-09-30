@@ -1,9 +1,10 @@
 import pandas as pd
 import argparse
+import glob
 
 import recommender
 from data_loader.data_loader import load_games, load_teams, load_coaches
-from postprocessing.postprocessing import postprocess
+from postprocessing.postprocessing import postprocess_results
 
 def get_recommendations_for_week(
     year: int, 
@@ -23,7 +24,10 @@ def get_recommendations_for_season_range(
     # Fetch all weeks of each season in the range
     games = []
     for year in range(start_year, end_year + 1):
-        games.append(load_games(year, force_data_update=force_data_update))
+        if year == end_year:
+            games.append(load_games(year, force_data_update=True))
+        else:
+            games.append(load_games(year, force_data_update=force_data_update))
         cols = ['season','week','season_type']
     games = (
         pd.concat(games, ignore_index=True)
@@ -45,9 +49,20 @@ def get_recommendations_for_season_range(
         )
     results = pd.concat(results, ignore_index=True)
 
-    postprocess_all_recommendations(results, start_year, end_year)
+    _postprocess_all_recommendations(results, start_year, end_year)
 
-def postprocess_all_recommendations(
+def postprocess():
+    """ Postprocess all recommendations in the results folder."""
+    files = glob.glob('results/*.parquet')
+    results = []
+    for file in files:
+        results.append(pd.read_parquet(file))
+    results = pd.concat(results, ignore_index=True)
+    start_year = results['season'].min()
+    end_year = results['season'].max()
+    _postprocess_all_recommendations(results, start_year, end_year)
+
+def _postprocess_all_recommendations(
         results: pd.DataFrame,
         start_year: int = None,
         end_year: int = None
@@ -60,11 +75,11 @@ def postprocess_all_recommendations(
     teams = pd.concat(teams, ignore_index=True)
     coaches = pd.concat(coaches, ignore_index=True)
 
-    results = postprocess(results, teams, coaches)
+    results = postprocess_results(results, teams, coaches)
 
 def main():
     parser = argparse.ArgumentParser(description='Fourth Down Pipeline Jobs')
-    parser.add_argument('--jobname', required=True, choices=['week', 'season_range'], 
+    parser.add_argument('--jobname', required=True, choices=['week', 'season_range', 'postprocess'],
                        help='Name of the job to run')
     
     # Arguments for week job
@@ -101,6 +116,9 @@ def main():
             end_year=args.end_year,
             force_data_update=args.force
         )
+    
+    elif args.jobname == "postprocess":
+        postprocess()
     
     else:
         raise ValueError(f"Unknown job name: {args.jobname}")
