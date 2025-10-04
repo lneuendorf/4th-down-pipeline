@@ -9,6 +9,12 @@ def postprocess_results(
     teams: pd.DataFrame,
     coaches: pd.DataFrame,
 ):
+    
+    data = data.drop_duplicates(subset=['season', 'week', 'season_type', 'game_id','play_id'], ignore_index=True)
+    breakpoint()
+    teams.drop_duplicates(subset=['season', 'id', 'color', 'alternate_color'], inplace=True, ignore_index=True)
+    coaches.drop_duplicates(inplace=True, ignore_index=True)
+
     # Get the recommendations
     data = recommend(data)
 
