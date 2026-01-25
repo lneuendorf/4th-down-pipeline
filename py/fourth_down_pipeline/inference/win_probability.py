@@ -30,7 +30,8 @@ def predict_win_probability(
         'yards_to_goal',
         'down',
         'distance',
-        'seconds_after_kneelout'
+        'seconds_after_kneelout',
+        'seconds_after_punt_and_opponent_kneelout',
         # 'can_kneel_out',
         # 'can_kneel_out_30',
         # 'can_kneel_out_60',

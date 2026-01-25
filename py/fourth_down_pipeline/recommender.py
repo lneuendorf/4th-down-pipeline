@@ -94,7 +94,7 @@ def generate_recommendations(
         'defense', 'defense_division', 'defense_timeouts', 'defense_score', 'defense_strength', 'pregame_defense_elo',
         'period', 'clock_minutes', 'clock_seconds', 'pct_game_played', 'pct_half_played', 
         'game_seconds_remaining', 'seconds_left_in_half',
-        'seconds_after_kneelout', 'can_kneel_out',
+        'seconds_after_kneelout', 'seconds_after_punt_and_opponent_kneelout', 'can_kneel_out',
         'can_kneel_out_30', 'can_kneel_out_60', 'can_kneel_out_90', 
         'play_type', 'play_text', 
         'score_diff', 'pregame_elo_diff', 'pregame_spread', 
