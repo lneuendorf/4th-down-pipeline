@@ -2,7 +2,7 @@ from os.path import join
 import pandas as pd
 import numpy as np
 
-APP_DATA_DIR = '../app/data'
+APP_DATA_DIR = '../cfb-4th-down-app/data'
 
 def postprocess_results(
     data: pd.DataFrame,
