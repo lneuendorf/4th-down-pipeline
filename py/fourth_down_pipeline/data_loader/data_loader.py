@@ -6,7 +6,6 @@ import cfbd
 from feature_engineering.elo_updater import update_elo
 from feature_engineering.team_strength import calculate_team_strengths
 
-CONFIG_PATH = 'config.json'
 DATA_PATH = 'data'
 
 pd.set_option('future.no_silent_downcasting', True)
@@ -17,10 +16,9 @@ logging.basicConfig(
 )
 LOG = logging.getLogger(__name__)
 
-with open(CONFIG_PATH) as f:
-    configuration = cfbd.Configuration(
-        access_token = json.load(f)['CFBD_API_KEY']
-    )
+configuration = cfbd.Configuration(
+    access_token = os.environ.get("CFBD_API_KEY")
+)
 
 def load_games(
     year: int, 
