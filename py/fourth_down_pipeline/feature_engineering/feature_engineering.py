@@ -557,6 +557,9 @@ def add_offense_success_rates(
         })[['season', 'week', 'offense', 'offense_pass_success_adjusted', 'offense_rush_success_adjusted']],
         on=['season', 'week', 'offense'],
         how='left'
+    ).assign(
+        offense_pass_success_adjusted=lambda x: x.offense_pass_success_adjusted.astype(float),
+        offense_rush_success_adjusted=lambda x: x.offense_rush_success_adjusted.astype(float)
     )
 
     return data.drop_duplicates()
