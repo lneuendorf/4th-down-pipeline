@@ -209,7 +209,10 @@ def predict_conversion_probability(
         'precipitation', 
         'wind_speed', 
         'temperature', 
-        'yards_to_goal', 
+        'yards_to_goal',
+        'is_goal_to_go', 
+        'offense_pass_success_adjusted',
+        'offense_rush_success_adjusted',
         'offense_strength', 
         'defense_strength'
     ]

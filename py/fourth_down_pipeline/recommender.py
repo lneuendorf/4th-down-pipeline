@@ -35,8 +35,9 @@ def generate_recommendations(
     lines = dl.load_lines(year, week, season_type, force_data_update)
     elo = dl.load_elo(year, week, season_type, force_data_update)
     team_strengths = dl.load_team_strengths(year, week, season_type, force_data_update)
+    advanced_team_stats = dl.load_advanced_team_stats(year, force_data_update)
 
-    data = fe.engineer_features(games, plays, weather, venues, lines, elo, team_strengths)
+    data = fe.engineer_features(games, plays, weather, venues, lines, elo, team_strengths, advanced_team_stats)
     data = fe.add_decision(data)
 
     # Other filtering
@@ -91,6 +92,7 @@ def generate_recommendations(
     cols = [
         'season', 'week', 'season_type', 'start_date', 'game_id', 'play_id', 
         'offense', 'offense_division', 'offense_timeouts', 'offense_score', 'offense_strength', 'pregame_offense_elo',
+        'offense_pass_success_adjusted', 'offense_rush_success_adjusted',
         'defense', 'defense_division', 'defense_timeouts', 'defense_score', 'defense_strength', 'pregame_defense_elo',
         'period', 'clock_minutes', 'clock_seconds', 'pct_game_played', 'pct_half_played', 
         'game_seconds_remaining', 'seconds_left_in_half',
@@ -99,7 +101,7 @@ def generate_recommendations(
         'play_type', 'play_text', 
         'score_diff', 'pregame_elo_diff', 'pregame_spread', 
         'diff_time_ratio', 'spread_time_ratio', 
-        'yards_to_goal', 'down', 'distance', 
+        'yards_to_goal', 'down', 'distance', 'is_goal_to_go',
         'home_id', 'home_team', 'home_conference', 
         'away_id', 'away_team', 'away_conference', 
         'is_home_team', 

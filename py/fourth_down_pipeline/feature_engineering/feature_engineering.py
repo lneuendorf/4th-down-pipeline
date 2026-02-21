@@ -1,6 +1,7 @@
 import logging
 from os.path import join
 import pickle
+import json
 from sklearn.linear_model import LinearRegression
 import pandas as pd
 import numpy as np
@@ -20,7 +21,8 @@ def engineer_features(
     venues: pd.DataFrame,
     lines: pd.DataFrame,
     elo: pd.DataFrame,
-    team_strengths: pd.DataFrame
+    team_strengths: pd.DataFrame,
+    advanced_team_stats: pd.DataFrame
 ) -> pd.DataFrame:
     """ Engineer features for 4th down decision making model.
 
@@ -31,7 +33,8 @@ def engineer_features(
         venues (pd.DataFrame): DataFrame containing venue information
         lines (pd.DataFrame): DataFrame containing betting lines
         elo (pd.DataFrame): DataFrame containing ELO ratings
-        team_strengths (pd.DataFrame): DataFrame containing team strength metrics
+        team_strengths (pd.DataFrame): DataFrame containing team strength metrics'
+        advanced_team_stats (pd.DataFrame): DataFrame containing advanced team stats
 
     Returns:
         pd.DataFrame: DataFrame with engineered features for 4th down decision making
@@ -66,6 +69,7 @@ def engineer_features(
             clock_seconds=lambda x: np.maximum(np.minimum(x['clock_seconds'], 59), 0),
             offense_score=lambda x: np.maximum(x['offense_score'], 0),
             defense_score=lambda x: np.maximum(x['defense_score'], 0),
+            is_goal_to_go=lambda x: x['yards_to_goal'] <= x['distance']
         )
         .assign(
             pct_game_played=lambda x: (((x['period'] - 1) * 15 * 60) + (15* 60) - 
@@ -265,6 +269,8 @@ def engineer_features(
     data = add_kneel_features(data)
 
     data = add_fg_pressure_rating(data)
+
+    data = add_offense_success_rates(data, games, elo, advanced_team_stats)
 
     return data
 
@@ -479,6 +485,81 @@ def add_fg_pressure_rating(data: pd.DataFrame) -> pd.DataFrame:
     )
 
     return data
+
+def add_offense_success_rates(
+    data: pd.DataFrame,
+    games: pd.DataFrame,
+    elo: pd.DataFrame,
+    advanced_team_stats: pd.DataFrame
+) -> pd.DataFrame:
+    """ Add offense pass and rush success rates, adjusted with priors from ELO ratings. """
+
+    advanced_team_stats = (
+        # only keep teams that had a game that week
+        games.dropna(subset=['home_points','away_points'])
+        .melt(
+            id_vars=['season','week', 'season_type'], 
+            value_vars=['home_team','away_team'], 
+            var_name='home_away', 
+            value_name='team'
+        ).drop(columns=['home_away'])
+        # Merge in advanced stats for that week
+        .merge(
+            advanced_team_stats[['season','week','team','offense_pass_success','offense_rush_success']], 
+            on=['season','week','team'], 
+            how='left'
+        )
+        # Merge in pre-game ELO for that week, will be used to approximate priors for success rates for teams
+        .merge(elo[['season','week','team','elo']], on=['season','week','team'], how='left')
+    )
+
+    advanced_team_stats['max_week'] = advanced_team_stats.groupby(['season', 'season_type'])['week'].transform('max')
+
+    # --- Regress each success rate on ELO for the season ---
+    success_cols = ['offense_pass_success', 'offense_rush_success']
+    for col in success_cols:
+        model_path = join(MODEL_DIR, 'offense_success_rate_model', f'{col}_regression_coefficients.json')
+        with open(model_path, 'r') as f:
+            model_wieghts = json.load(f)
+
+        reg = LinearRegression()
+        reg.coef_ = np.atleast_1d(model_wieghts['coef']).astype(float)
+        reg.intercept_ = float(model_wieghts['intercept'])
+        reg.n_features_in_ = 1
+        reg.feature_names_in_ = np.array(['elo'])
+        
+        # Prior from ELO
+        X = advanced_team_stats[['elo']].astype(float)
+        advanced_team_stats[f'{col}_prior'] = reg.predict(X)
+        
+        # Fill missing success rates with prior (for teams with no plays in that week)
+        advanced_team_stats[col] = advanced_team_stats[col].fillna(advanced_team_stats[f'{col}_prior'])
+
+        # Update observed success rate with weighted prior
+        # Weight increases as season progresses: week/max_week
+        advanced_team_stats[f'{col}_adjusted'] = (
+            advanced_team_stats[f'{col}_prior'] * (1 - advanced_team_stats['week']/(advanced_team_stats['max_week'] + 1)) +
+            advanced_team_stats[col] * (advanced_team_stats['week']/(advanced_team_stats['max_week'] + 1))
+        )
+
+    # Keep relevant columns
+    keep_cols = ['season', 'week', 'season_type', 'team', 'elo'] + \
+                success_cols + \
+                [f'{c}_prior' for c in success_cols] + \
+                [f'{c}_adjusted' for c in success_cols]
+    advanced_team_stats = advanced_team_stats[keep_cols]
+
+    data = data.merge(
+        advanced_team_stats.rename(columns={
+            'team': 'offense',
+            'offense_pass_success_adjusted': 'offense_pass_success_adjusted',
+            'offense_rush_success_adjusted': 'offense_rush_success_adjusted'
+        })[['season', 'week', 'offense', 'offense_pass_success_adjusted', 'offense_rush_success_adjusted']],
+        on=['season', 'week', 'offense'],
+        how='left'
+    )
+
+    return data.drop_duplicates()
 
 def _impute_point_spread(data: pd.DataFrame) -> pd.DataFrame:
     """ Impute missing point spreads using linear regression based on ELO ratings.

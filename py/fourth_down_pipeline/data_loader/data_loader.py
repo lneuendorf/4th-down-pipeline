@@ -24,7 +24,8 @@ def load_games(
     year: int, 
     week: Optional[int] = None,
     season_type: Optional[str] = None,
-    force_data_update: Optional[bool] = False
+    force_data_update: Optional[bool] = False,
+    update_data: bool = True
 ) -> pd.DataFrame:
     """Load games data for a specific year, week, and season type from CFBD API.
     Must pass a value for year, but if week and season_type are not provided,
@@ -36,6 +37,8 @@ def load_games(
         season_type (str, optional): Type of the season ('regular' or 'postseason')
         force_data_update (bool, optional): If True, forces data to be fetched 
             from API even if cached data exists.
+        update_data (bool, optional): If True, updates the cached data with newly fetched 
+            data. Only relevant if force_data_update is True.
     """
     if season_type is None and week is not None:
         raise ValueError('If week is provided, season_type must also be provided')
@@ -95,7 +98,8 @@ def load_games(
     ).drop(columns=['home_classification', 'away_classification'])
     games = games[cols + ['home_division', 'away_division']]
 
-    games.to_parquet(file_path)
+    if update_data:
+        games.to_parquet(file_path)
 
     if season_type is None and week is None:
         return games.reset_index(drop=True)
@@ -722,6 +726,67 @@ def load_team_strengths(
 
     return team_strengths
 
+def load_advanced_team_stats(
+    year: int,
+    force_data_update: bool = False
+) -> pd.DataFrame:
+    """Load advanced team stats for a specific year, and season type.
+
+    Args:
+        year (int): Year of the season (e.g., 2023)
+        force_data_update (bool): If True, force update of data even if cached data exists
+
+    Returns:
+        pd.DataFrame: DataFrame containing advanced team stats for the specified year, week, and season type
+    """
+    advanced_stats_dir = join(DATA_PATH, 'team_advanced_stats')
+    os.makedirs(advanced_stats_dir, exist_ok=True)
+    file_path = join(advanced_stats_dir, f'{year}.parquet')
+
+    if os.path.exists(file_path) and not force_data_update:
+        LOG.info(f'Reading {year} advanced team stats from cached data')
+        advanced_stats = pd.read_parquet(file_path)
+        # There is no advanced team stats data for 2019 season, so skip the check for that season
+        if not advanced_stats.query('season == @year').empty or year == 2019:
+            return advanced_stats[
+                (advanced_stats['season'] == year)
+            ].reset_index(drop=True)
+        LOG.info(f'Missing {year} advanced team stats')
+    LOG.info(f'Fetching {year} advanced team stats from CFBD API')
+
+    season_dfs = []
+    with cfbd.ApiClient(configuration) as api_client:
+        api_instance = cfbd.StatsApi(api_client)
+        for week in range(3, 16):
+            try:
+                data = api_instance.get_advanced_season_stats(
+                    year=year,
+                    start_week=1,
+                    end_week=week,
+                    exclude_garbage_time=True
+                )
+            except Exception as e:
+                LOG.warning(f'No advanced team stats for {year} week {week}.')
+                continue
+            week_stats = pd.DataFrame([val.to_dict() for val in data])
+            week_stats.columns = _convert_to_snake_case(week_stats.columns)
+            week_stats['offense_pass_success'] = week_stats['offense'].apply(lambda x: x['passingPlays']['successRate'])
+            week_stats['offense_rush_success'] = week_stats['offense'].apply(lambda x: x['rushingPlays']['successRate'])
+            week_stats['week'] = week + 1 # Stats are up to the end of the previous week, so add 1 to align with current week
+            week_stats['season'] = year
+            season_dfs.append(week_stats)
+        
+    if season_dfs:
+        advanced_stats = pd.concat(season_dfs, ignore_index=True)
+    else:
+        LOG.warning(f'No advanced team stats found for {year}. Returning empty DataFrame.')
+        cols = ['season', 'team', 'conference', 'offense', 'defense', 'offense_pass_success', 
+                'offense_rush_success', 'week']
+        advanced_stats = pd.DataFrame(columns=cols)
+    advanced_stats.to_parquet(file_path)
+    return advanced_stats[
+        (advanced_stats['season'] == year)
+    ].reset_index(drop=True)
 
 def _convert_to_snake_case(cols):
     cols_new = []
