@@ -21,6 +21,8 @@ def compute_fourth_down_attempt_eWP(data: pd.DataFrame) -> pd.DataFrame:
     LOG.info('Predicting win probabilities after successful fourth down conversion.')
     wp_features = [
         'score_diff',
+        'offense_score',
+        'defense_score',
         'diff_time_ratio',
         'spread_time_ratio',
         'pregame_offense_elo',

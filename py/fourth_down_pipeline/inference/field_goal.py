@@ -35,6 +35,8 @@ def compute_field_goal_eWP(data: pd.DataFrame) -> pd.DataFrame:
     LOG.info('Predicting win probabilities after FG make.')
     wp_features = [
         'score_diff',
+        'offense_score',
+        'defense_score',
         'diff_time_ratio',
         'spread_time_ratio',
         'pregame_offense_elo',
