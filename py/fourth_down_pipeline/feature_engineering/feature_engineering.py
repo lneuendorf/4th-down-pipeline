@@ -368,8 +368,10 @@ def add_decision(data: pd.DataFrame) -> pd.DataFrame:
         )
     )
 
-    drop_actions = [
-        'penalty', 'timeout', 'kickoff', 'end_of_period', 'safety', 'kneel', 'other'
+    drop_actions = [ # 'penalty', NOTE: removing pentalty from drop plays as we dont know
+        # if the penalty caused a replay or not
+        #  'safety',
+        'timeout', 'kickoff', 'end_of_period', 'kneel', 'other'
     ]
     data = data.query('action not in @drop_actions').reset_index(drop=True)
 
