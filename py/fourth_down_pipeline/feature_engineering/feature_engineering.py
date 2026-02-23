@@ -276,27 +276,37 @@ def engineer_features(
 
 def add_decision(data: pd.DataFrame) -> pd.DataFrame:
     rush = (
-        data['play_text'].str.contains('rush', case=False) |
-        data['play_text'].str.contains('run', case=False) |
-        data['play_text'].str.contains('scramble', case=False) |
+        data['play_text'].str.lower().str.startswith('rush ') |
+        data['play_text'].str.lower().str.contains(' rush ') |
+        data['play_text'].str.lower().str.startswith('run ') |
+        data['play_text'].str.lower().str.contains(' run ') |
+        data['play_text'].str.lower().str.startswith('scramble ') |
+        data['play_text'].str.lower().str.contains(' scramble ') |
         (data['play_type'] == 'Rush')
     )
     pass_ = (
-        data['play_text'].str.contains('pass', case=False) |
-        data['play_text'].str.contains('throw', case=False) |
-        data['play_text'].str.contains('sack', case=False) |
+        data['play_text'].str.lower().str.startswith('throw ') |
+        data['play_text'].str.lower().str.contains(' throw ') |
         data['play_text'].str.contains('intercept', case=False) |
-        (data['play_type'].str.contains('Pass', case=False)) |
-        (data['play_type'].str.contains('Sack', case=False)) 
+        data['play_text'].str.lower().str.startswith('pass ') |
+        data['play_text'].str.lower().str.contains(' pass ') |
+        data['play_type'].str.lower().str.startswith('pass ') |
+        data['play_type'].str.lower().str.contains(' pass ') |
+        data['play_text'].str.lower().str.startswith('sack ') |
+        data['play_text'].str.lower().str.contains(' sack ') |
+        data['play_type'].str.lower().str.startswith('sack ') |
+        data['play_type'].str.lower().str.contains(' sack ')
     )
     punt = (
-        data['play_text'].str.contains('punt', case=False) |
-        data['play_type'].str.contains('Punt', case=False) | 
-        (data.play_type == 'Punt')
+        data['play_text'].str.lower().str.startswith('punt ') |
+        data['play_text'].str.lower().str.contains(' punt ') |
+        data['play_type'].str.lower().str.startswith('punt ') |
+        data['play_type'].str.lower().str.contains(' punt ')
     )
     field_goal = (
         data['play_text'].str.contains('field goal', case=False) |
-        data['play_text'].str.contains('fg', case=False) |
+        data['play_text'].str.lower().str.startswith('fg ') |
+        data['play_type'].str.lower().str.contains(' fg ') |
         data['play_type'].str.contains('Field Goal', case=False)
     )
     penalty = (
@@ -314,24 +324,34 @@ def add_decision(data: pd.DataFrame) -> pd.DataFrame:
         data['play_text'].str.contains('taunting', case=False)
     )
     kneel = (
-        data['play_text'].str.contains('kneel', case=False) |
-        data['play_type'].str.contains('Kneel', case=False)
+        data['play_text'].str.lower().str.startswith('kneel ') |
+        data['play_text'].str.lower().str.contains(' kneel ') |
+        data['play_type'].str.lower().str.startswith('kneel ') |
+        data['play_type'].str.lower().str.contains(' kneel ')
     )
     timeout = (
-        data['play_text'].str.contains('timeout', case=False) |
-        data['play_type'].str.contains('Timeout', case=False)
+        data['play_text'].str.lower().str.startswith('timeout ') |
+        data['play_text'].str.lower().str.contains(' timeout ') |
+        data['play_type'].str.lower().str.startswith('timeout ') |
+        data['play_type'].str.lower().str.contains(' timeout ')
     )
     kickoff = (
-        data['play_text'].str.contains('kickoff', case=False) |
-        data['play_type'].str.contains('Kickoff', case=False)
+        data['play_text'].str.lower().str.startswith('kickoff ') |
+        data['play_text'].str.lower().str.contains(' kickoff ') |
+        data['play_type'].str.lower().str.startswith('kickoff ') |
+        data['play_type'].str.lower().str.contains(' kickoff ')
     )
     end_of_period = (
-        data['play_text'].str.contains('end ', case=False) |
-        data['play_type'].str.contains('end ', case=False)
+        data['play_text'].str.lower().str.startswith('end ') |
+        data['play_text'].str.lower().str.contains(' end ') |
+        data['play_type'].str.lower().str.startswith('end ') |
+        data['play_type'].str.lower().str.contains(' end ')
     )
     safety = (
-        data['play_text'].str.contains('safety', case=False) |
-        data['play_type'].str.contains('Safety', case=False)
+        data['play_text'].str.lower().str.startswith('safety ') |
+        data['play_text'].str.lower().str.contains(' safety ') |
+        data['play_type'].str.lower().str.startswith('safety ') |
+        data['play_type'].str.lower().str.contains(' safety ')
     )
 
     data = data.assign(
