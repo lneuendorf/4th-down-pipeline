@@ -356,12 +356,12 @@ def add_decision(data: pd.DataFrame) -> pd.DataFrame:
 
     data = data.assign(
         action=np.select(
-            [
-                penalty, end_of_period, timeout, kneel, kickoff, field_goal, 
+            [ # penalty,
+                end_of_period, timeout, kneel, kickoff, field_goal, 
                 punt, rush, pass_, safety
             ],
-            [
-                'penalty', 'end_of_period', 'timeout', 'kneel', 'kickoff', 
+            [ # 'penalty'
+                'end_of_period', 'timeout', 'kneel', 'kickoff', 
                 'field_goal', 'punt', 'rush', 'pass', 'safety'
             ],
             default='other'
@@ -370,8 +370,7 @@ def add_decision(data: pd.DataFrame) -> pd.DataFrame:
 
     drop_actions = [ # 'penalty', NOTE: removing pentalty from drop plays as we dont know
         # if the penalty caused a replay or not
-        #  'safety',
-        'timeout', 'kickoff', 'end_of_period', 'kneel', 'other'
+        'safety', 'timeout', 'kickoff', 'end_of_period', 'kneel', 'other'
     ]
     data = data.query('action not in @drop_actions').reset_index(drop=True)
 
@@ -533,9 +532,10 @@ def add_offense_success_rates(
         )
         # Merge in pre-game ELO for that week, will be used to approximate priors for success rates for teams
         .merge(elo[['season','week','team','elo']], on=['season','week','team'], how='left')
+        .drop_duplicates(subset=['season','season_type','week','team'], keep='first')
     )
 
-    advanced_team_stats['max_week'] = advanced_team_stats.groupby(['season', 'season_type'])['week'].transform('max')
+    advanced_team_stats['max_week'] = advanced_team_stats.groupby(['season', 'team'])['week'].transform('max')
 
     # --- Regress each success rate on ELO for the season ---
     success_cols = ['offense_pass_success', 'offense_rush_success']
@@ -563,6 +563,26 @@ def add_offense_success_rates(
             advanced_team_stats[f'{col}_prior'] * (1 - advanced_team_stats['week']/(advanced_team_stats['max_week'] + 1)) +
             advanced_team_stats[col] * (advanced_team_stats['week']/(advanced_team_stats['max_week'] + 1))
         )
+         # Replace postseason values with the last regular season values (max_week)
+        def get_last_regular_season_stats(row):
+            "Returns {col}_prior, {col}_adjusted, and {col} for the last regular season week of postseason rows"
+            if row['season_type'] == 'postseason':
+                last_regular_week = row['max_week']
+                last_regular_stats = advanced_team_stats.query(
+                    'season == @row.season and team == @row.team and week == @last_regular_week and season_type == "regular"'
+                )
+                if not last_regular_stats.empty:
+                    return pd.Series({
+                        f'{col}_prior': last_regular_stats[f'{col}_prior'].values[0],
+                        f'{col}_adjusted': last_regular_stats[f'{col}_adjusted'].values[0],
+                        col: last_regular_stats[col].values[0]
+                    })
+            return pd.Series({
+                f'{col}_prior': row[f'{col}_prior'],
+                f'{col}_adjusted': row[f'{col}_adjusted'],
+                col: row[col]
+            })
+        advanced_team_stats[[f'{col}_prior', f'{col}_adjusted', col]] = advanced_team_stats.apply(get_last_regular_season_stats, axis=1)
 
     # Keep relevant columns
     keep_cols = ['season', 'week', 'season_type', 'team', 'elo'] + \
