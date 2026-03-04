@@ -1,11 +1,15 @@
 import logging
+import pickle
 import pandas as pd
 import numpy as np
 import statsmodels.api as sm
 from scipy.stats import norm
+from sklearn.preprocessing import StandardScaler
 from inference import win_probability
 from feature_engineering.feature_engineering import add_kneel_features
 
+SELECTION_SCALER_PATH = 'models/fg_probability/scalar_selection.pkl'
+OUTCOME_SCALER_PATH = 'models/fg_probability/scalar_outcome.pkl'
 SELECTION_MODEL_PATH = 'models/fg_probability/selection_model.pkl'
 OUTCOME_MODEL_PATH = 'models/fg_probability/outcome_model.pkl'
 
@@ -173,23 +177,26 @@ def predict_field_goal_make_probability(
         pd.Series: Field goal probability predictions (values between 0 and 1).
     """
 
-    selection_features = [
+    continuous_selection_features = [
         'yards_to_goal', 
         'score_diff',
         'pct_game_played', 
         'pregame_offense_elo', 
         'pregame_defense_elo', 
         'distance', 
-        'is_home_team',
         'wind_speed', 
         'temperature',
-        'elevation', 
-        'grass', 
-        'game_indoors'
+        'elevation'
     ]
+    binary_selection_features = ['is_home_team', 'grass', 'game_indoors']
+
+    # Scale continuous features using the pre-fitted scaler
+    with open(SELECTION_SCALER_PATH, 'rb') as f:
+        selection_scaler = pickle.load(f)
+    df[continuous_selection_features] = selection_scaler.transform(df[continuous_selection_features])
 
     selection_df = (
-        df[selection_features]
+        df[continuous_selection_features + binary_selection_features]
         .assign(const=1)
         .set_index('const', append=True)
         .reset_index()
@@ -204,19 +211,22 @@ def predict_field_goal_make_probability(
     Phi = norm.cdf(W_gamma)
     df['lambda'] = phi / Phi
 
-    df['yards_to_goal_squared'] = df['yards_to_goal'] ** 2
     outcome_features = [
         'season',
-        'yards_to_goal_squared',  
+        'yards_to_goal',  
         'pregame_offense_elo', 
-        'pregame_defense_elo',
         'pressure_rating',
         'wind_speed', 
         'elevation', 
-        'lambda'
     ]
+
+    # Scale continuous features using the pre-fitted scaler
+    with open(OUTCOME_SCALER_PATH, 'rb') as f:
+        outcome_scaler = pickle.load(f)
+    df[outcome_features] = outcome_scaler.transform(df[outcome_features])
+
     outcome_df = (
-        df[outcome_features]
+        df[outcome_features + ['lambda']]
         .assign(const=1)
         .set_index('const', append=True)
         .reset_index()
