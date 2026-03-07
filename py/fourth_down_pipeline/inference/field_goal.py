@@ -178,6 +178,8 @@ def predict_field_goal_make_probability(
     Returns:
         pd.Series: Field goal probability predictions (values between 0 and 1).
     """
+    # Create a copy of the original to avoid standardizing feature used in original data variable
+    df = df.copy()
 
     continuous_selection_features = [
         'yards_to_goal', 
