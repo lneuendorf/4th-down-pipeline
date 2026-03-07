@@ -161,6 +161,8 @@ def compute_field_goal_eWP(data: pd.DataFrame) -> pd.DataFrame:
         (data['fg_make_proba'] * data['wp_make_proba']) + 
         ((1 - data['fg_make_proba']) * data['wp_miss_proba'])
     ).round(4)
+
+    data['season'] = data['season'].astype(int)
     
     return data
 
