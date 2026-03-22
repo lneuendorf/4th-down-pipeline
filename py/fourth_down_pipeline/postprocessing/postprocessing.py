@@ -19,7 +19,7 @@ def postprocess_results(
     data = recommend(data)
 
     # Merge teams to data
-    team_cols = ['season', 'id', 'color', 'alternate_color', 'logos']
+    team_cols = ['season', 'id', 'abbreviation', 'color', 'alternate_color', 'logos']
     data_cols = ['start_date', 'season', 'week', 'season_type', 'game_id', 'play_id', 
         'offense', 'offense_id', 'offense_division', 'offense_conference', 'offense_timeouts', 'offense_score', 'pregame_offense_elo',
         'defense', 'defense_id', 'defense_division', 'defense_conference', 'defense_timeouts', 'defense_score', 'pregame_defense_elo',
@@ -202,7 +202,7 @@ def generate_team_tendencies(
         inplace=True
     )
 
-    team_tendencies_res.to_parquet(
+    team_tendencies_res.drop_duplicates(ignore_index=True).to_parquet(
         join(APP_DATA_DIR, 'team_tendencies.parquet'),
         index=False,
     )
@@ -295,7 +295,7 @@ def generate_coach_tendencies(
         inplace=True
     )
 
-    coach_tendencies_res.to_parquet(
+    coach_tendencies_res.drop_duplicates(ignore_index=True).to_parquet(
         join(APP_DATA_DIR, 'coach_tendencies.parquet'),
         index=False,
     )
@@ -334,9 +334,9 @@ def generate_game_decisions(
 
     cols = [
         'season', 'week', 
-        'offense_team', 'offense_conference', 'offense_division', 'offense_logos', 
+        'offense_team', 'offense_abbreviation', 'offense_conference', 'offense_division', 'offense_logos', 
         'offense_score', 'coach_name',
-        'defense_team', 'defense_logos', 'defense_score',
+        'defense_team', 'defense_abbreviation', 'defense_logos', 'defense_score',
         'exp_wp_go', 'exp_wp_fg', 'exp_wp_punt',
         'time','pregame_offense_elo','pregame_defense_elo','down','distance','yards_to_goal', 
         'recommendation', 'decision', 'play_text'
@@ -346,12 +346,14 @@ def generate_game_decisions(
         'season': 'Season',
         'week': 'Week',
         'offense_team': 'Offense Team',
+        'offense_abbreviation': 'Offense Abbreviation',
         'offense_conference': 'Offense Conference',
         'offense_division': 'Offense Division',
         'offense_logos': 'Offense Logo',
         'offense_score': 'Offense Score',
         'coach_name': 'Offense Coach Name',
         'defense_team': 'Defense Team',
+        'defense_abbreviation': 'Defense Abbreviation',
         'defense_logos': 'Defense Logo',
         'defense_score': 'Defense Score',
         'wp_diff': 'Win Probability Diff',
@@ -397,7 +399,7 @@ def generate_game_decisions(
         data_decisions['Down'].map(down_map) + ' & ' + data_decisions['Distance'].astype(str)
     )
 
-    data_decisions.to_parquet(
+    data_decisions.drop_duplicates(ignore_index=True).to_parquet(
         join(APP_DATA_DIR, 'game_decisions.parquet'),
         index=False,
     )
