@@ -137,20 +137,21 @@ def compute_field_goal_eWP(data: pd.DataFrame) -> pd.DataFrame:
             is_home_team=lambda x: np.select([x['is_home_team'] == 1, x['is_home_team'] == -1], [-1, 1], default=0),
             offense_timeouts_new=lambda x: x.defense_timeouts,
             defense_timeouts_new=lambda x: x.offense_timeouts,
-            yards_to_goal=lambda x: 100 - x['yards_to_goal'],
+            yards_to_goal_new=lambda x: 100 - x['yards_to_goal'],
             down=1,
-            distance=10
+            distance=lambda x: np.minimum(10, 100 - x['yards_to_goal'])
         )
         .drop(columns=['offense_timeouts','defense_timeouts',
                        'pregame_offense_elo', 'pregame_defense_elo',
-                          'offense_score', 'defense_score'])
+                          'offense_score', 'defense_score', 'yards_to_goal'])
         .rename(columns={
             'offense_timeouts_new':'offense_timeouts',
             'defense_timeouts_new':'defense_timeouts',
             'pregame_offense_elo_new':'pregame_offense_elo',
             'pregame_defense_elo_new':'pregame_defense_elo',
             'offense_score_new':'offense_score',
-            'defense_score_new':'defense_score'
+            'defense_score_new':'defense_score',
+            'yards_to_goal_new':'yards_to_goal'
         })
     )
 
