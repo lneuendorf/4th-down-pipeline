@@ -26,11 +26,11 @@ def compute_field_goal_eWP(data: pd.DataFrame) -> pd.DataFrame:
     # Hardcoded probabilities for long FG attempts
     data['kick_distance'] = data['yards_to_goal'] + 17
     rules = [
-        ('55 <= kick_distance < 57', 0.08),
-        ('57 <= kick_distance < 59', 0.05),
+        ('55 <= kick_distance < 57', 0.04),
+        ('57 <= kick_distance < 59', 0.03),
         ('59 <= kick_distance < 61', 0.02),
-        ('61 <= kick_distance < 65', 0.01),
-        ('65 <= kick_distance <= 70', 0.005),
+        ('61 <= kick_distance < 65', 0.005),
+        ('65 <= kick_distance <= 70', 0.001),
         ('kick_distance > 70', 0.0)
     ]
     for rule, base_prob in rules:
