@@ -1,5 +1,6 @@
 import xgboost as xgb
 import pandas as pd
+import numpy as np
 
 MODEL_PATH = 'models/win_probability/xgb_classifier.json'
 
@@ -39,7 +40,12 @@ def predict_win_probability(
         # 'can_kneel_out_60',
         # 'can_kneel_out_90',
     ]
-    dmatrix = xgb.DMatrix(df[feature_names])
+    dmatrix = xgb.DMatrix(
+        df[feature_names]
+        .assign(
+            distance = np.where(df.distance > df.yards_to_goal, df.yards_to_goal, df.distance)
+        )
+    )
 
     model = _load_model(MODEL_PATH)
     preds = model.predict(dmatrix)
