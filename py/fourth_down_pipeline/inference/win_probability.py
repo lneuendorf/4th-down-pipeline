@@ -18,6 +18,8 @@ def predict_win_probability(
 
     feature_names = [
         'score_diff',
+        'offense_score',
+        'defense_score',
         'diff_time_ratio',
         'spread_time_ratio',
         'pregame_offense_elo',
