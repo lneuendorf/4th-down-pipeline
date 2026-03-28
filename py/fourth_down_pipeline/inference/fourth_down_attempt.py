@@ -234,7 +234,12 @@ def predict_conversion_probability(
         'offense_strength', 
         'defense_strength'
     ]
-    dmatrix = xgb.DMatrix(df[feature_names])
+    dmatrix = xgb.DMatrix(
+        df[feature_names]
+        .assign(
+            distance = np.where(df.distance > df.yards_to_goal, df.yards_to_goal, df.distance)
+        )        
+    )
 
     model = _load_model(MODEL_PATH)
     preds = model.predict(dmatrix)

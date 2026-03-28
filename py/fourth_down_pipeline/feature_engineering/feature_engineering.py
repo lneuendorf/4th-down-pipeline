@@ -142,7 +142,7 @@ def engineer_features(
         )
         .assign(
             distance=lambda x: np.where(
-                x.yards_to_goal - x.distance < 0,
+                x.distance > x.yards_to_goal,
                 x.yards_to_goal,
                 x.distance
             )
