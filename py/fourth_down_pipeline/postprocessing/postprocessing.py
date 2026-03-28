@@ -333,10 +333,10 @@ def generate_game_decisions(
     data['distance'] = data.distance.replace(0, 1)
 
     cols = [
-        'season', 'week', 
-        'offense_team', 'offense_abbreviation', 'offense_conference', 'offense_division', 'offense_logos', 
+        'season', 'week', 'season_type',
+        'offense_team', 'offense_abbreviation', 'offense_conference', 'offense_division', 'offense_timeouts', 'offense_logos', 
         'offense_score', 'coach_name',
-        'defense_team', 'defense_abbreviation', 'defense_logos', 'defense_score',
+        'defense_team', 'defense_abbreviation', 'defense_timeouts', 'defense_logos', 'defense_score',
         'exp_wp_go', 'exp_wp_fg', 'exp_wp_punt',
         'time','pregame_offense_elo','pregame_defense_elo','down','distance','yards_to_goal', 
         'recommendation', 'decision', 'play_text'
@@ -349,11 +349,13 @@ def generate_game_decisions(
         'offense_abbreviation': 'Offense Abbreviation',
         'offense_conference': 'Offense Conference',
         'offense_division': 'Offense Division',
+        'offense_timeouts': 'Offense Timeouts',
         'offense_logos': 'Offense Logo',
         'offense_score': 'Offense Score',
         'coach_name': 'Offense Coach Name',
         'defense_team': 'Defense Team',
         'defense_abbreviation': 'Defense Abbreviation',
+        'defense_timeouts': 'Defense Timeouts',
         'defense_logos': 'Defense Logo',
         'defense_score': 'Defense Score',
         'wp_diff': 'Win Probability Diff',
