@@ -64,6 +64,16 @@ def compute_fourth_down_attempt_eWP(data: pd.DataFrame) -> pd.DataFrame:
                 (-1 * x['score_diff']) - 7, # flip defense to offense team
                 x['score_diff']
             ),
+            offense_score_new=lambda x: np.where(
+                x.yards_to_goal <= x.distance, # if scored touchdown
+                x['defense_score'] + 7,
+                x['offense_score']
+            ),
+            defense_score_new=lambda x: np.where(
+                x.yards_to_goal <= x.distance, # if scored touchdown
+                x['offense_score'],
+                x['defense_score']
+            ),
             spread_time_ratio=lambda x: np.where(
                 x.yards_to_goal <= x.distance,  # if scored touchdown
                 (-x['pregame_spread']) * np.exp(-4 * (3600 - np.maximum(x['game_seconds_remaining'] - 5, 0)) / 3600),
@@ -98,12 +108,15 @@ def compute_fourth_down_attempt_eWP(data: pd.DataFrame) -> pd.DataFrame:
             distance=10
         )
         .drop(columns=['offense_timeouts', 'defense_timeouts'
-                       ,'pregame_offense_elo', 'pregame_defense_elo'])
+                       ,'pregame_offense_elo', 'pregame_defense_elo',
+                          'offense_score', 'defense_score'])
         .rename(columns={
             'offense_timeouts_new': 'offense_timeouts',
             'defense_timeouts_new': 'defense_timeouts',
             'pregame_offense_elo_new': 'pregame_offense_elo',
-            'pregame_defense_elo_new': 'pregame_defense_elo'
+            'pregame_defense_elo_new': 'pregame_defense_elo',
+            'offense_score_new': 'offense_score',
+            'defense_score_new': 'defense_score'
         })
     )
     
@@ -145,6 +158,8 @@ def compute_fourth_down_attempt_eWP(data: pd.DataFrame) -> pd.DataFrame:
                 (-x['score_diff'] * np.exp(4 * (3600 - np.maximum(x['game_seconds_remaining'] - 5, 0)) / 3600))
             ),
             score_diff=lambda x: x.score_diff * -1,
+            offense_score_new=lambda x: x.defense_score,
+            defense_score_new=lambda x: x.offense_score,
             spread_time_ratio=lambda x: (
                 (-x['pregame_spread']) * np.exp(-4 * (3600 - np.maximum(x['game_seconds_remaining'] - 5, 0)) / 3600)
             ),
@@ -165,12 +180,15 @@ def compute_fourth_down_attempt_eWP(data: pd.DataFrame) -> pd.DataFrame:
             distance=10
         )
         .drop(columns=['offense_timeouts','defense_timeouts'
-                       ,'pregame_offense_elo', 'pregame_defense_elo'])
+                       ,'pregame_offense_elo', 'pregame_defense_elo'
+                       ,'offense_score', 'defense_score'])
         .rename(columns={
             'offense_timeouts_new':'offense_timeouts',
             'defense_timeouts_new':'defense_timeouts',
             'pregame_offense_elo_new':'pregame_offense_elo',
-            'pregame_defense_elo_new':'pregame_defense_elo'
+            'pregame_defense_elo_new':'pregame_defense_elo',
+            'offense_score_new':'offense_score',
+            'defense_score_new':'defense_score'
         })
     )
     wp_fail_data = add_kneel_features(wp_fail_data)

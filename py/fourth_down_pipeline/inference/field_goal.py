@@ -73,6 +73,8 @@ def compute_field_goal_eWP(data: pd.DataFrame) -> pd.DataFrame:
                 (-x['score_diff'] - 3) * np.exp(4 * (3600 - np.maximum(x['game_seconds_remaining'] - 5, 0)) / 3600)
             ),
             score_diff=lambda x: -x['score_diff'] - 3,
+            offense_score_new=lambda x: x.defense_score,
+            defense_score_new=lambda x: x.offense_score + 3,
             spread_time_ratio=lambda x: (
                 (-x['pregame_spread']) * np.exp(-4 * (3600 - np.maximum(x['game_seconds_remaining'] - 5, 0)) / 3600)
             ),
@@ -90,12 +92,15 @@ def compute_field_goal_eWP(data: pd.DataFrame) -> pd.DataFrame:
 
         )
         .drop(columns=['offense_timeouts','defense_timeouts',
-                      'pregame_offense_elo', 'pregame_defense_elo'])
+                       'pregame_offense_elo', 'pregame_defense_elo',
+                       'offense_score', 'defense_score'])
         .rename(columns={
             'offense_timeouts_new':'offense_timeouts',
             'defense_timeouts_new':'defense_timeouts',
             'pregame_offense_elo_new':'pregame_offense_elo',
-            'pregame_defense_elo_new':'pregame_defense_elo'
+            'pregame_defense_elo_new':'pregame_defense_elo',
+            'offense_score_new':'offense_score',
+            'defense_score_new':'defense_score'
         })
     )
 
@@ -120,6 +125,8 @@ def compute_field_goal_eWP(data: pd.DataFrame) -> pd.DataFrame:
                 (-x['score_diff']) * np.exp(4 * (3600 - np.maximum(x['game_seconds_remaining'] - 5, 0)) / 3600)
             ),
             score_diff=lambda x: (-1 * x['score_diff']),
+            offense_score_new=lambda x: x.defense_score,
+            defense_score_new=lambda x: x.offense_score,
             spread_time_ratio=lambda x: (
                 (-x['pregame_spread']) * np.exp(-4 * (3600 - np.maximum(x['game_seconds_remaining'] - 5, 0)) / 3600)
             ),
@@ -135,12 +142,15 @@ def compute_field_goal_eWP(data: pd.DataFrame) -> pd.DataFrame:
             distance=10
         )
         .drop(columns=['offense_timeouts','defense_timeouts',
-                       'pregame_offense_elo', 'pregame_defense_elo'])
+                       'pregame_offense_elo', 'pregame_defense_elo',
+                          'offense_score', 'defense_score'])
         .rename(columns={
             'offense_timeouts_new':'offense_timeouts',
             'defense_timeouts_new':'defense_timeouts',
             'pregame_offense_elo_new':'pregame_offense_elo',
-            'pregame_defense_elo_new':'pregame_defense_elo'
+            'pregame_defense_elo_new':'pregame_defense_elo',
+            'offense_score_new':'offense_score',
+            'defense_score_new':'defense_score'
         })
     )
 
