@@ -20,7 +20,7 @@ def compute_punt_eWP(data: pd.DataFrame) -> pd.DataFrame:
     LOG.info('Predicting punt yards to goal.')
     data['receiving_team_yards_to_goal'] = np.where(
         data.yards_to_goal < 40,
-        88,
+        80, # Ball placed at the 20 if the punt goes into the endzone
         predict_receiving_team_yards_to_goal(
             data.rename(columns={
                 'yards_to_goal':'punt_team_end_yards_to_goal',
