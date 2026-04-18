@@ -80,6 +80,18 @@ def engineer_features(
         .query('0 < period <= 4') # only regulation
         .query('0 <= yards_to_goal <= 100')
         .query('0 <= distance <= 100')
+        .assign(
+            distance = lambda x: np.where(
+                x.distance == 0,
+                1,
+                x.distance
+            ),
+            yards_to_goal = lambda x: np.where(
+                x.yards_to_goal == 0,
+                1,
+                x.yards_to_goal
+            )
+        )
         # .drop(columns=['period','clock_minutes','clock_seconds'])
         .merge(
             games[game_cols].rename(columns={'id':'game_id'}),
