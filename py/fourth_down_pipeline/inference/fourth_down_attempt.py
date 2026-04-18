@@ -61,17 +61,17 @@ def compute_fourth_down_attempt_eWP(data: pd.DataFrame) -> pd.DataFrame:
             ),
             score_diff=lambda x: np.where(
                 x.yards_to_goal <= x.distance,  # if scored touchdown
-                (-1 * x['score_diff']) - 7, # flip defense to offense team
+                -x['score_diff'] - 7, # flip defense to offense team
                 x['score_diff']
             ),
             offense_score_new=lambda x: np.where(
                 x.yards_to_goal <= x.distance, # if scored touchdown
-                x['defense_score'] + 7,
+                x['defense_score'],
                 x['offense_score']
             ),
             defense_score_new=lambda x: np.where(
                 x.yards_to_goal <= x.distance, # if scored touchdown
-                x['offense_score'],
+                x['offense_score'] + 7, # add 7 points for touchdown
                 x['defense_score']
             ),
             spread_time_ratio=lambda x: np.where(
@@ -79,8 +79,16 @@ def compute_fourth_down_attempt_eWP(data: pd.DataFrame) -> pd.DataFrame:
                 (-x['pregame_spread']) * np.exp(-4 * (3600 - np.maximum(x['game_seconds_remaining'] - 5, 0)) / 3600),
                 (x['pregame_spread']) * np.exp(-4 * (3600 - np.maximum(x['game_seconds_remaining'] - 5, 0)) / 3600)
             ),
-            pregame_offense_elo_new=lambda x: x.pregame_offense_elo,
-            pregame_defense_elo_new=lambda x: x.pregame_defense_elo,
+            pregame_offense_elo_new=lambda x: np.where(
+                x.yards_to_goal <= x.distance, # if scored touchdown
+                x.pregame_defense_elo,
+                x.pregame_offense_elo
+            ),
+            pregame_defense_elo_new=lambda x: np.where(
+                x.yards_to_goal <= x.distance, # if scored touchdown
+                x.pregame_offense_elo,
+                x.pregame_defense_elo
+            ),
             pct_game_played=lambda x: np.minimum(x['pct_game_played'] + five_seconds_pct, 1.0),
             seconds_left_in_half=lambda x: np.maximum(x['seconds_left_in_half'] - 5, 0),
             game_seconds_remaining=lambda x: np.maximum(x['game_seconds_remaining'] - 5, 0),
@@ -234,7 +242,6 @@ def predict_conversion_probability(
         'wind_speed', 
         'temperature', 
         'yards_to_goal',
-        'is_goal_to_go', 
         'offense_pass_success_adjusted',
         'offense_rush_success_adjusted',
         'offense_strength', 
