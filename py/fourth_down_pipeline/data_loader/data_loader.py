@@ -109,6 +109,26 @@ def load_games(
         (games['season_type'] == season_type)
     ].reset_index(drop=True)
 
+def load_last_week_of_regular_season(year: int, force_data_update: bool = False) -> int:
+    """Load the last week of the regular season for a given year from CFBD API.
+
+    Args:
+        year (int): Year of the season (e.g., 2023)
+        force_data_update (bool): If True, forces data to be fetched from API even
+            if cached data exists.
+    Returns:
+        int: The last week of the regular season for the given year
+    """
+    # use the games data to determine the last week of the regular season
+    games = load_games(year, force_data_update=force_data_update)
+    regular_season_games = games[games['season_type'] == 'regular']
+    if regular_season_games.empty:
+        LOG.warning(f'No regular season games found for {year}, defaulting last week of regular season to 15')
+        return 15
+    last_week = regular_season_games['week'].max()
+    LOG.info(f'Last week of regular season for {year} is {last_week}')
+    return last_week
+
 def load_plays(
     year: int, 
     week: Optional[int] = None,

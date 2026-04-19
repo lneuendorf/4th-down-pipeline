@@ -5,6 +5,7 @@ import json
 from sklearn.linear_model import LinearRegression
 import pandas as pd
 import numpy as np
+from data_loader.data_loader import load_last_week_of_regular_season
 
 MODEL_DIR = 'models'
 
@@ -282,7 +283,12 @@ def engineer_features(
 
     data = add_fg_pressure_rating(data)
 
-    data = add_offense_success_rates(data, games, elo, advanced_team_stats)
+    if data.season.nunique() > 1:
+        raise ValueError('Data contains multiple seasons, but feature engineering functions ' \
+        'are currently designed to handle one season at a time. Please filter data to a single ' \
+        'season before feature engineering.')
+    last_week_of_regular_season = load_last_week_of_regular_season(data['season'].max())
+    data = add_offense_success_rates(data, games, elo, advanced_team_stats, last_week_of_regular_season)
 
     return data
 
@@ -523,7 +529,8 @@ def add_offense_success_rates(
     data: pd.DataFrame,
     games: pd.DataFrame,
     elo: pd.DataFrame,
-    advanced_team_stats: pd.DataFrame
+    advanced_team_stats: pd.DataFrame,
+    last_week_of_regular_season: int
 ) -> pd.DataFrame:
     """ Add offense pass and rush success rates, adjusted with priors from ELO ratings. """
 
@@ -547,7 +554,7 @@ def add_offense_success_rates(
         .drop_duplicates(subset=['season','season_type','week','team'], keep='first')
     )
 
-    advanced_team_stats['max_week'] = advanced_team_stats.groupby(['season', 'team'])['week'].transform('max')
+    advanced_team_stats['max_week'] = last_week_of_regular_season
 
     # --- Regress each success rate on ELO for the season ---
     success_cols = ['offense_pass_success', 'offense_rush_success']
